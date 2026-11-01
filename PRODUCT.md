@@ -26,12 +26,14 @@ The game combines automated alien behavior with tactical placement, activity pro
 ## Operating Context
 
 `Assets/Scenes/Main.unity` is the first enabled Build Settings scene and contains
-the Stage 1 board shell: a 10x10 `BoardGrid`, one world unit per cell, and a 3x3
+the Stage 1 board shell: a 10x10 `BoardGrid`, one world unit per cell, and a 5x5
 opening area. `RunLoopController` provides Placement, Running, Paused,
 RunComplete, and Defeated states, a prototype timer, and reset hooks. Its alien
-roster is not connected yet. `StageGridProgression` owns the prototype duration
-and expansion thresholds; the final values remain open. Process machines and
-combat are not part of this scene yet.
+roster contains Seal, Cat, Pufferfish, and Duck; the shared `GridActor` stores
+their health and grid state, and `TeamPlacementController` supports placement
+within open cells. `StageGridProgression` owns the prototype duration and
+expansion thresholds; final values remain open. Process machines and combat are
+not part of this scene yet.
 
 `Assets/Scenes/Gameplay.unity` remains the playable duck + seal reference with
 fixed casino and jump-rope activities, enemies, supplies, Switch relocation,

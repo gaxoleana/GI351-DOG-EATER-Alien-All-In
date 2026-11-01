@@ -18,7 +18,7 @@ namespace AlienAllIn
         Vector2Int[] playerStartCells = Array.Empty<Vector2Int>();
 
         [Header("Prototype grid sizes")]
-        [SerializeField, Min(1)] int openingSize = 3;
+        [SerializeField, Min(1)] int openingSize = 5;
         [SerializeField, Min(1)] int middleSize = 5;
         [SerializeField, Min(1)] int lateSize = 7;
 

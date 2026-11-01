@@ -34,10 +34,10 @@ namespace AlienAllIn
 
         readonly List<GridActor> survivorRoster = new List<GridActor>();
         readonly List<GridActor> actorsToReset = new List<GridActor>();
-        readonly Dictionary<GridActor, Vector3> authoredPositions = new Dictionary<GridActor, Vector3>();
         float timeScaleBeforeFreeze = 1f;
         bool ownsTimeFreeze;
         bool outcomeResolutionQueued;
+        string placementMessage = string.Empty;
 
         public RunState State => state;
         public float ElapsedSeconds => elapsedSeconds;
@@ -50,11 +50,23 @@ namespace AlienAllIn
             {
                 int count = 0;
                 foreach (GridActor alien in survivorRoster)
-                    if (alien && alien.Alive) count++;
+                    if (alien && alien.CountsAsActiveRunMember && alien.Alive) count++;
                 return count;
             }
         }
-        public int RegisteredAlienCount => survivorRoster.Count;
+        public int RegisteredAlienCount
+        {
+            get
+            {
+                int count = 0;
+                foreach (GridActor alien in survivorRoster)
+                    if (alien && alien.CountsAsActiveRunMember) count++;
+                return count;
+            }
+        }
+        public IReadOnlyList<GridActor> Survivors => survivorRoster;
+        public bool CanPlaceTeam => state == RunState.Placement;
+        public string PlacementMessage => placementMessage;
         /// <summary>Use this scaled delta for future gameplay systems that need an explicit run clock.</summary>
         public float GameplayDeltaTime => state == RunState.Running ? Time.deltaTime : 0f;
 
@@ -106,7 +118,7 @@ namespace AlienAllIn
         {
             if (state != RunState.Running) return;
 
-            if (survivorRoster.Count > 0 && LivingAlienCount == 0)
+            if (RegisteredAlienCount > 0 && LivingAlienCount == 0)
             {
                 Finish(RunState.Defeated);
                 return;
@@ -124,7 +136,7 @@ namespace AlienAllIn
             if (state != RunState.Running) yield break;
 
             // The final survivor may be eliminated by another gameplay system later this frame.
-            Finish(survivorRoster.Count > 0 && LivingAlienCount == 0
+            Finish(RegisteredAlienCount > 0 && LivingAlienCount == 0
                 ? RunState.Defeated
                 : RunState.RunComplete);
         }
@@ -133,12 +145,54 @@ namespace AlienAllIn
         {
             if (state != RunState.Placement || !stage) return;
 
+            if (!TryValidateFormation(out placementMessage)) return;
+
+            // The selected formation becomes the run's saved starting arrangement.
+            foreach (GridActor actor in actorsToReset)
+                if (actor) actor.CaptureStartingPosition();
+
             elapsedSeconds = 0f;
             ApplyStageProgress();
             state = RunState.Running;
+            placementMessage = string.Empty;
 
-            if (survivorRoster.Count > 0 && LivingAlienCount == 0)
+            if (RegisteredAlienCount > 0 && LivingAlienCount == 0)
                 Finish(RunState.Defeated);
+        }
+
+        bool TryValidateFormation(out string reason)
+        {
+            if (survivorRoster.Count == 0)
+            {
+                reason = "Roster missing.";
+                return false;
+            }
+
+            var occupied = new HashSet<Vector2Int>();
+            foreach (GridActor alien in survivorRoster)
+            {
+                if (!alien || !alien.Alive)
+                {
+                    reason = "All must be alive.";
+                    return false;
+                }
+
+                alien.RefreshCell();
+                if (!alien.IsOnBoard || !stage.IsInActiveArea(alien.CurrentCell))
+                {
+                    reason = "Use open cells.";
+                    return false;
+                }
+
+                if (!occupied.Add(alien.CurrentCell))
+                {
+                    reason = "No duplicate cells.";
+                    return false;
+                }
+            }
+
+            reason = string.Empty;
+            return true;
         }
 
         public void Pause()
@@ -161,14 +215,15 @@ namespace AlienAllIn
             elapsedSeconds = 0f;
             state = RunState.Placement;
             outcomeResolutionQueued = false;
+            placementMessage = string.Empty;
             ApplyStageProgress();
             ResetStageObjects();
             RunRestarted?.Invoke();
         }
 
         /// <summary>
-        /// Registers an alien for team-wipe detection and restart. The empty Main scene roster
-        /// is intentional until the alien placement/roster system is connected.
+        /// Registers an additional survivor for team-wipe detection and restart.
+        /// Duplicate references are ignored; the authored Main roster is loaded in Awake.
         /// </summary>
         public void RegisterSurvivor(GridActor alien)
         {
@@ -186,7 +241,7 @@ namespace AlienAllIn
         {
             if (!actor) return;
             if (!actorsToReset.Contains(actor)) actorsToReset.Add(actor);
-            if (!authoredPositions.ContainsKey(actor)) authoredPositions.Add(actor, actor.transform.position);
+            if (!actor.HasStartingPosition) actor.CaptureStartingPosition();
             if (resetOnRegister) actor.ResetActor();
         }
 
@@ -200,7 +255,7 @@ namespace AlienAllIn
             foreach (GridActor actor in actorsToReset)
             {
                 if (!actor) continue;
-                if (authoredPositions.TryGetValue(actor, out Vector3 start)) actor.transform.position = start;
+                actor.RestoreStartingPosition();
                 actor.ResetActor();
             }
 
@@ -237,23 +292,23 @@ namespace AlienAllIn
 
         void OnGUI()
         {
-            const float width = 320f;
-            const float height = 132f;
+            const float width = 154f;
+            const float height = 140f;
             GUI.Box(new Rect(16f, 16f, width, height), string.Empty);
-            GUI.Label(new Rect(28f, 24f, width - 24f, 22f), $"RUN: {state}");
-            GUI.Label(new Rect(28f, 48f, width - 24f, 22f), $"TIME: {FormatTime(TimeRemainingSeconds)}");
+            GUI.Label(new Rect(24f, 24f, width - 16f, 22f), $"RUN: {state}");
+            GUI.Label(new Rect(24f, 48f, width - 16f, 22f), $"TIME: {FormatTime(TimeRemainingSeconds)}");
 
             string roster = survivorRoster.Count == 0
-                ? "ALIENS: roster not connected"
-                : $"ALIENS: {LivingAlienCount}/{RegisteredAlienCount} alive";
-            GUI.Label(new Rect(28f, 72f, width - 24f, 22f), roster);
+                ? "TEAM: 0/0"
+                : $"TEAM: {LivingAlienCount}/{RegisteredAlienCount}";
+            GUI.Label(new Rect(24f, 72f, width - 16f, 22f), roster);
+            string controls = state == RunState.Placement ? "Space: Start" :
+                state == RunState.Running ? "Space: Pause" :
+                state == RunState.Paused ? "Space: Resume" : "R: Restart";
+            GUI.Label(new Rect(24f, 94f, width - 16f, 18f),
+                string.IsNullOrEmpty(placementMessage) ? controls : placementMessage);
 
-            string instruction = state == RunState.Placement ? "Space: Start   |   R: Restart" :
-                state == RunState.Running ? "Space: Pause   |   R: Restart" :
-                state == RunState.Paused ? "Space: Resume   |   R: Restart" : "R: Restart";
-            GUI.Label(new Rect(28f, 96f, 190f, 22f), instruction);
-
-            if (GUI.Button(new Rect(230f, 98f, 92f, 24f), "Restart")) Restart();
+            if (GUI.Button(new Rect(24f, 112f, width - 16f, 22f), "Restart (R)")) Restart();
         }
 
         static string FormatTime(float seconds)

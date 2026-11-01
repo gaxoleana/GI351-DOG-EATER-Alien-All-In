@@ -3,30 +3,49 @@
 ## Stage 1 entry scene
 
 `Assets/Scenes/Main.unity` is the first enabled Build Settings scene. It contains
-the Stage 1 board shell: a 10x10 `BoardGrid`, with a 3x3 area open at 0% run
+the Stage 1 board shell: a 10x10 `BoardGrid`, with a 5x5 area open at 0% run
 progress and locked cells visible in a darker color. `RunLoopController` starts
 and pauses the run, shows a basic timer/status panel, and restarts the stage. It
-does not add actors, Process machines, combat, or resources.
+is connected to the four-member Seal, Cat, Pufferfish, and Duck roster. The
+team is editable in the RunLoop Inspector and appears under `Stage 1/Team`.
+Process machines, combat, and resources are not part of this scene yet.
 
 `StageGridProgression` is the single Main-scene source for the prototype run
 duration (300 seconds) and grid milestones. The GDD leaves the final duration
-and expansion milestones open. Prototype thresholds open 5x5 at 25%, 7x7 at
-50%, and the full 10x10 board at 75%. The run loop reads progress from its one
+and expansion milestones open. The opening area is 5x5. Existing prototype
+thresholds hold that area through 25%, open 7x7 at 50%, and the full 10x10 board
+at 75%. The run loop reads progress from its one
 elapsed-time clock. It exposes optional authored player start cells and the
 currently open cells as potential Process spawn candidates. Candidates do not
 spawn machines, choose their type, or filter occupied cells.
-`playerStartCells` and the surviving-alien roster are empty until a team/placement
-system is specified. Register aliens with `RunLoopController.RegisterSurvivor`
-when that system is connected; a configured team wipe ends the run as Defeated.
-With no roster connected, the UI says so and the loop cannot infer alien deaths.
-Process completion is not a run-end condition.
+The Stage start cells and RunLoop survivor roster contain the same four unique
+open cells/members. The `TeamPlacementController` uses `BoardGrid` occupancy and
+does not add colliders to each tile. During Placement, select a member from the
+roster panel (or press 1-4), then click an empty open cell to move it. Locked,
+outside, and teammate-occupied cells are rejected. Space only starts once all
+members are alive, inside the open grid, and in distinct cells. All four members,
+including Duck, count toward a team wipe for this prototype. `RegisterSurvivor`
+is deduplicated and Restart keeps the existing roster instead of registering it
+again. Process completion is not a run-end condition.
+
+The shared `GridActor` stores species, health/alive state, current grid cell, and
+the run-start position. Restart restores the saved formation and calls
+`ResetActor`, which returns each Animator to Idle. Each species has Idle, Attack,
+and Ultimate clips at 8 FPS. Idle loops; Attack and Ultimate return to Idle after
+one play. Duck's Attack clip is retained on its animation driver as a supplemental
+asset, but the Duck controller has no Attack state and `PlayAttack` rejects Duck.
+Processing currently remains on Idle until a Process animation is specified.
+The sprite sheets use Point filtering, 362 PPU (one 362-pixel frame per one-unit
+cell), no mipmaps, and uncompressed textures. The source files currently live
+under `Assets/AlienAllIn/Art/Sprites/` in this project.
 
 Space starts from Placement and pauses/resumes while running; R restarts. Pause
 and terminal states set Unity's scaled game time to zero. Restart restores the
-authored actor positions/state and any optional activities or pickups wired to
-the controller, then returns the grid to its opening area. The final-frame tie
-rule checks team elimination before timeout, matching the existing Gameplay
-prototype's outcome order.
+saved starting positions, HP/state/Idle animation and any optional activities or
+pickups wired to the controller, then returns the grid to its opening area. The
+final-frame tie rule checks team elimination before timeout, matching the
+existing Gameplay prototype's outcome order. Main's shared GridActor HP is 30
+per member as a prototype value; the GDD does not set Alien HP.
 
 `Assets/Scenes/Gameplay.unity` remains the playable duck + seal reference scene
 described below; it was kept separate from the Stage 1 entry scene.

@@ -2,13 +2,16 @@ using UnityEngine;
 
 namespace AlienAllIn
 {
-    public enum ActorKind { Duck, Seal, Enemy }
+    // Keep existing serialized enum values stable; new species are appended after Enemy.
+    public enum ActorKind { Duck, Seal, Enemy, Cat, Pufferfish }
     public enum ActorState { Idle, Moving, Collecting, Working, Fleeing, Hiding, Defending, Dead }
 
     [DisallowMultipleComponent]
     public sealed class GridActor : MonoBehaviour
     {
         public ActorKind kind;
+        [Tooltip("Only active run members contribute to the RunLoop defeat condition. Enemies are never run members.")]
+        public bool countsAsActiveRunMember = true;
         public BoardGrid board;
         [Min(1)] public float maxHealth = 30;
         [Min(.01f)] public float moveSpeed = 2.5f;
@@ -23,11 +26,18 @@ namespace AlienAllIn
         [SerializeField] float health;
         [SerializeField] ActorState state;
         [SerializeField, Range(0, 1)] float switchCharge;
+        [SerializeField] Vector3 startingPosition;
+        [SerializeField] Vector2Int startingCell;
+        [SerializeField] bool hasStartingPosition;
         float effectTimer;
         public Vector2Int CurrentCell => currentCell;
         public bool IsOnBoard => isOnBoard;
         public float Health => health;
         public bool Alive => health > 0;
+        public bool CountsAsActiveRunMember => kind != ActorKind.Enemy && countsAsActiveRunMember;
+        public Vector3 StartingPosition => startingPosition;
+        public Vector2Int StartingCell => startingCell;
+        public bool HasStartingPosition => hasStartingPosition;
         public ActorState State { get => state; set => state = value; }
         public float SwitchCharge => switchCharge;
         public float AttackTimer { get; set; }
@@ -44,6 +54,21 @@ namespace AlienAllIn
             effectTimer = 0;
             RefreshCell();
             Present(0, false);
+            if (TryGetComponent(out AlienAnimationDriver animationDriver)) animationDriver.ResetToIdle();
+        }
+
+        public void CaptureStartingPosition()
+        {
+            startingPosition = transform.position;
+            RefreshCell();
+            startingCell = isOnBoard ? currentCell : default;
+            hasStartingPosition = true;
+        }
+
+        public void RestoreStartingPosition()
+        {
+            if (hasStartingPosition) transform.position = startingPosition;
+            RefreshCell();
         }
 
         public void RefreshCell()
