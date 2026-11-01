@@ -1504,6 +1504,105 @@ MonoBehaviour:
   lockedColor: {r: 0.055, g: 0.09, b: 0.12, a: 1}
   unlocked: 0
   occupants: []
+--- !u!1 &198877238
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 198877239}
+  - component: {fileID: 198877240}
+  m_Layer: 0
+  m_Name: Run Systems
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &198877239
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 198877238}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 200366913}
+  - {fileID: 687555653}
+  m_Father: {fileID: 1371843181}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &198877240
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 198877238}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: df07a7b9e8480974fb5d40b6de58873e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: AlienAllIn.Runtime::AlienAllIn.MainRunGameplaySystems
+  runLoop: {fileID: 1371843182}
+  stage: {fileID: 1371843180}
+  board: {fileID: 446845523}
+  duck: {fileID: 121809680}
+  seal: {fileID: 1246218288}
+  enemyPrefab: {fileID: 6194910739404016673, guid: f037d4da808f43b4a8afa4ab0b9eebe0, type: 3}
+  casinoPrefab: {fileID: 1313235792489912841, guid: 30b90d8433659594299a9522c5963b9d, type: 3}
+  enemyContainer: {fileID: 200366913}
+  processContainer: {fileID: 687555653}
+  processSpawnIntervalSeconds: 60
+  processSpawnChance: 0.25
+  casinoDurationSeconds: 36
+  cashTickSeconds: 1
+  duckProcessingMultiplier: 1.1
+  processInterruptionSeconds: 2
+  firstEnemyDelaySeconds: 7
+  enemySpawnIntervalSeconds: 4.5
+  maxEnemies: 8
+  sealKnockbackDistance: 0.45
+  cash: 0
+  processedStations: 0
+  statusMessage: No Process station yet.
+--- !u!1 &200366912
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 200366913}
+  m_Layer: 0
+  m_Name: Enemies
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &200366913
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 200366912}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 198877239}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &206152316
 GameObject:
   m_ObjectHideFlags: 0
@@ -3522,6 +3621,37 @@ MonoBehaviour:
   lockedColor: {r: 0.055, g: 0.09, b: 0.12, a: 1}
   unlocked: 0
   occupants: []
+--- !u!1 &687555652
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 687555653}
+  m_Layer: 0
+  m_Name: Processes
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &687555653
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 687555652}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 198877239}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &704991213
 GameObject:
   m_ObjectHideFlags: 0
@@ -6167,6 +6297,10 @@ PrefabInstance:
       propertyPath: hasStartingPosition
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 7386895653003618250, guid: e6b3d64900ab3384a9dff495bf4a39db, type: 3}
+      propertyPath: countsAsActiveRunMember
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -7610,6 +7744,10 @@ PrefabInstance:
       propertyPath: hasStartingPosition
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 7305756046637191110, guid: 5ff06ea13c41a554e9ab4215530a0bdb, type: 3}
+      propertyPath: countsAsActiveRunMember
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 7989960612876997347, guid: 5ff06ea13c41a554e9ab4215530a0bdb, type: 3}
       propertyPath: m_Name
       value: Cat
@@ -7806,6 +7944,7 @@ Transform:
   m_Children:
   - {fileID: 446845524}
   - {fileID: 161528204}
+  - {fileID: 198877239}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1371843182

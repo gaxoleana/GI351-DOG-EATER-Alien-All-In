@@ -227,17 +227,9 @@ namespace AlienAllIn
 
         void SealAttack(float range, float damage)
         {
-            seal.ShowAttack(range);
-            foreach (var enemy in enemies)
-            {
-                if (!enemy || !enemy.Alive || Vector3.Distance(enemy.transform.position, seal.transform.position) > range) continue;
-                float dealt = Mathf.Min(damage, enemy.Health);
-                enemy.Hurt(damage); seal.AddCharge(dealt);
-                if (!enemy.Alive) { defeatedEnemies++; continue; }
-                Vector3 push = (enemy.transform.position - seal.transform.position).normalized * knockbackDistance;
-                Vector3 proposed = enemy.transform.position + push;
-                if (board.TryWorldToCell(proposed, out _)) enemy.transform.position = proposed;
-            }
+            int livingBefore = CountLivingEnemies();
+            CombatAndSpawnRules.ResolveSealAoe(seal, enemies, board, range, damage, knockbackDistance);
+            defeatedEnemies += Mathf.Max(0, livingBefore - CountLivingEnemies());
         }
 
         void TickDuck(float dt)
@@ -288,42 +280,15 @@ namespace AlienAllIn
             GridActor target = !duck.Alive ? seal : !seal.Alive ? duck :
                 Vector3.Distance(enemy.transform.position, duck.transform.position) < Vector3.Distance(enemy.transform.position, seal.transform.position) ? duck : seal;
             if (!target.Alive) return;
-            enemy.AttackTimer -= dt;
-            if (Vector3.Distance(enemy.transform.position, target.transform.position) <= enemy.attackRange)
-            {
-                enemy.State = ActorState.Defending;
-                if (enemy.AttackTimer <= 0) { target.Hurt(enemy.damage); enemy.AttackTimer = enemy.attackInterval; }
-            }
-            else { enemy.State = ActorState.Moving; enemy.MoveTowards(target.transform.position, dt); }
+            CombatAndSpawnRules.TickMelee(enemy, target.transform.position, dt, () => target.Hurt(enemy.damage));
         }
 
         public GridActor SpawnEnemy()
         {
-            Vector2Int min = board.ActiveMinCell;
-            int centerX = min.x + (board.ActiveWidth - 1) / 2;
-            int centerY = min.y + (board.ActiveHeight - 1) / 2;
-            for (int attempt = 0; attempt < 4; attempt++)
-            {
-                int edge = (nextSpawnEdge + attempt) % 4;
-                Vector2Int cell = edge switch
-                {
-                    0 => new Vector2Int(min.x, centerY),
-                    1 => new Vector2Int(centerX, min.y + board.ActiveHeight - 1),
-                    2 => new Vector2Int(min.x + board.ActiveWidth - 1, centerY),
-                    _ => new Vector2Int(centerX, min.y)
-                };
-
-                BoardCell boardCell = board.GetCell(cell);
-                if (!boardCell || boardCell.Occupants.Count > 0) continue;
-                nextSpawnEdge = (edge + 1) % 4;
-                GridActor enemy = Instantiate(enemyPrefab, board.CellCenter(cell), Quaternion.identity, enemyContainer);
-                enemy.name = $"Enemy {++spawnIndex:00}";
-                enemy.board = board; enemy.ResetActor(); enemies.Add(enemy);
-                return enemy;
-            }
-
-            nextSpawnEdge = (nextSpawnEdge + 1) % 4;
-            return null;
+            GridActor enemy = GridEnemySpawner.SpawnAtActiveEdges(
+                board, enemyPrefab, enemyContainer, ref spawnIndex, ref nextSpawnEdge);
+            if (enemy) enemies.Add(enemy);
+            return enemy;
         }
 
         void UpdateTimedBoardSize()

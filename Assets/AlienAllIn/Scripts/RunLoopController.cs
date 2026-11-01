@@ -19,7 +19,7 @@ namespace AlienAllIn
         [SerializeField] StageGridProgression stage;
 
         [Header("Run participants")]
-        [SerializeField, Tooltip("Aliens whose elimination ends the run. Can be wired by a future roster/placement system.")]
+        [SerializeField, Tooltip("Registered team roster. Only GridActors marked Active Run Member count toward a defeat.")]
         GridActor[] survivingAliens = Array.Empty<GridActor>();
         [SerializeField, Tooltip("All stage actors whose positions and health/state must be restored by Restart.")]
         GridActor[] resetActors = Array.Empty<GridActor>();

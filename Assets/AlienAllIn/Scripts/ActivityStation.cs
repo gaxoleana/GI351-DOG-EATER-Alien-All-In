@@ -49,7 +49,7 @@ namespace AlienAllIn
             }
             bool correctWorker = worker && (worker.kind == requiredKind ||
                 (allowUniversalDuckWorker && worker.kind == ActorKind.Duck));
-            if (!correctWorker || !worker.Alive || !worker.IsOnBoard || worker.CurrentCell != Cell)
+            if (!board || !correctWorker || !worker.Alive || !worker.IsOnBoard || worker.CurrentCell != Cell)
             {
                 currentWorker = null;
                 return 0;

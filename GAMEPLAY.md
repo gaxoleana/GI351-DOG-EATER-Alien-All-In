@@ -8,7 +8,8 @@ progress and locked cells visible in a darker color. `RunLoopController` starts
 and pauses the run, shows a basic timer/status panel, and restarts the stage. It
 is connected to the four-member Seal, Cat, Pufferfish, and Duck roster. The
 team is editable in the RunLoop Inspector and appears under `Stage 1/Team`.
-Process machines, combat, and resources are not part of this scene yet.
+Seal and Duck are the active run members in this slice. Cat and Pufferfish remain
+placeable roster members but have no run AI and do not prevent a team wipe.
 
 `StageGridProgression` is the single Main-scene source for the prototype run
 duration (300 seconds) and grid milestones. The GDD leaves the final duration
@@ -16,17 +17,15 @@ and expansion milestones open. The opening area is 5x5. Existing prototype
 thresholds hold that area through 25%, open 7x7 at 50%, and the full 10x10 board
 at 75%. The run loop reads progress from its one
 elapsed-time clock. It exposes optional authored player start cells and the
-currently open cells as potential Process spawn candidates. Candidates do not
-spawn machines, choose their type, or filter occupied cells.
+currently open cells as potential Process spawn candidates.
 The Stage start cells and RunLoop survivor roster contain the same four unique
 open cells/members. The `TeamPlacementController` uses `BoardGrid` occupancy and
 does not add colliders to each tile. During Placement, select a member from the
 roster panel (or press 1-4), then click an empty open cell to move it. Locked,
 outside, and teammate-occupied cells are rejected. Space only starts once all
-members are alive, inside the open grid, and in distinct cells. All four members,
-including Duck, count toward a team wipe for this prototype. `RegisterSurvivor`
-is deduplicated and Restart keeps the existing roster instead of registering it
-again. Process completion is not a run-end condition.
+members are alive, inside the open grid, and in distinct cells.
+`RegisterSurvivor` is deduplicated and Restart keeps the existing roster instead
+of registering it again. Process completion is not a run-end condition.
 
 The shared `GridActor` stores species, health/alive state, current grid cell, and
 the run-start position. Restart restores the saved formation and calls
@@ -47,13 +46,53 @@ final-frame tie rule checks team elimination before timeout, matching the
 existing Gameplay prototype's outcome order. Main's shared GridActor HP is 30
 per member as a prototype value; the GDD does not set Alien HP.
 
+## Main vertical slice
+
+`MainRunGameplaySystems` advances only while `RunLoopController` reports Running
+and uses its `GameplayDeltaTime`. Pause, terminal states, and Restart therefore
+freeze or reset Process, spawning, combat, and Cash with the same run clock.
+Restart removes runtime-created stations and enemies, clears Cash and Processed
+count, and resets spawn clocks. It does not create a second run outcome system.
+
+The Main scene starts with no Process station. Prototype settings on
+`Stage 1/Run Systems` roll every 60 run seconds with a 25% chance to create one
+Casino station. It samples the current open grid, rejects cells with any Alien
+or another station, and allows an Enemy on the chosen cell to be crushed. If no
+eligible cell exists, that roll is skipped and tried again at the next interval;
+this is a temporary rule because the GDD leaves this case open. There is no
+extra station-count cap beyond available cells.
+
+The Casino uses the existing `ActivityStation` as Seal's station. Duck can work
+any species' station and gets the GDD's 1.10 work-rate multiplier. Prototype
+duration is 36 seconds at the owner's rate; Cash pays +1 every 1 second of active
+work. When work reaches 100%, the station increments the Processed count once
+and is removed. No separate Cash completion bonus is added because the GDD does
+not specify one. An Enemy hit on the station or its current worker pauses work
+for 2 seconds while preserving progress. The station has no HP in this
+prototype; interruption duration and Cash/work timing are Inspector values.
+
+Enemies reuse `Assets/AlienAllIn/Prefabs/Enemy.prefab` and the existing Gameplay
+prototype stats: HP 10, speed 0.8, damage 3, melee range 0.65, and 1.2-second
+attack cadence. Prototype spawning begins after 7 seconds, then checks every
+4.5 seconds up to 8 live enemies. Seal reuses its existing AOE/range/damage
+fields (range 2.7, damage 4, 0.75-second cadence) and 0.45-unit Knockback.
+Enemy timings and combat values remain editable prototype values, not final
+balance.
+
+The simple RUN SYSTEMS panel shows current Cash, Casino progress or interruption
+time, Processed count, and each live Enemy's HP. RunComplete still comes only
+from the timer; Defeated checks only Seal and Duck, the Main slice's members
+marked `countsAsActiveRunMember`.
+
 `Assets/Scenes/Gameplay.unity` remains the playable duck + seal reference scene
 described below; it was kept separate from the Stage 1 entry scene.
 
 Open `Assets/Scenes/Gameplay.unity` in Unity **6000.5.10f1** and press Play.
 The board, all 100 cells, duck, seal, two activity stations, supply, HUD and
 references are saved scene objects. They are visible and editable before Play.
-The only dynamically instantiated objects are enemies, from `Enemy.prefab`.
+In this reference scene, the only dynamically instantiated objects are enemies,
+from `Enemy.prefab`. The shared combat and spawn helpers retain its existing
+behavior; Main uses them under the separate RunLoop clock.
 The board uses sprites without text labels. Activity progress and selected-unit
 health are shown in the sidebar; cell coordinates and occupancy remain in the Inspector.
 
