@@ -19,7 +19,15 @@ namespace AlienAllIn
         public ActivityStation[] activities;
         public FieldPickup[] pickups;
         public GameplayHUD hud;
-        [Header("Prototype balance (seconds and world units)")]
+        [Header("One-shot run")]
+        [Min(60)] public float runDuration = 300;
+        [Min(1)] public int openingBoardSize = 3;
+        [Min(1)] public int middleBoardSize = 5;
+        [Min(1)] public int lateBoardSize = 7;
+        [Min(0.1f)] public float lateSpawnInterval = 2.75f;
+        [Min(0.1f)] public float cameraScaleSpeed = 2.5f;
+        [Min(0.1f)] public float maxBoardCameraSize = 5.65f;
+        [Header("Combat balance (seconds and world units)")]
         [Min(.1f)] public float firstEnemyDelay = 7;
         [Min(.1f)] public float spawnInterval = 4.5f;
         [Min(1)] public int maxEnemies = 8;
@@ -42,12 +50,17 @@ namespace AlienAllIn
         float nextSpawn;
         bool initialized, trampolineReady;
         int spawnIndex;
+        int nextSpawnEdge;
         public StagePhase Phase => phase;
         public bool Paused => paused;
         public int Cash => cash;
         public int Trampolines => trampolines;
         public int DefeatedEnemies => defeatedEnemies;
         public float Elapsed => elapsed;
+        public float TimeRemaining => Mathf.Max(0, runDuration - elapsed);
+        public float StageProgress => Mathf.Clamp01(elapsed / Mathf.Max(.01f, runDuration));
+        public int ActiveBoardWidth => board ? board.ActiveWidth : 0;
+        public int ActiveBoardHeight => board ? board.ActiveHeight : 0;
         public GridActor Selected => selected;
         public IReadOnlyList<GridActor> Enemies => enemies;
         public string Message => message;
@@ -65,19 +78,23 @@ namespace AlienAllIn
             foreach (var enemy in enemies)
                 if (enemy) { if (Application.isPlaying) Destroy(enemy.gameObject); else DestroyImmediate(enemy.gameObject); }
             enemies.Clear();
+            int openingWidth = Mathf.Min(openingBoardSize, board.width);
+            int openingHeight = Mathf.Min(openingBoardSize, board.height);
+            board.SetActiveSize(openingWidth, openingHeight);
             duck.transform.position = duckStart;
             seal.transform.position = sealStart;
             duck.ResetActor(); seal.ResetActor();
             foreach (var activity in activities) activity.ResetActivity();
             foreach (var pickup in pickups) pickup.ResetPickup();
-            cash = trampolines = defeatedEnemies = spawnIndex = 0;
+            cash = trampolines = defeatedEnemies = spawnIndex = nextSpawnEdge = 0;
             elapsed = 0; nextSpawn = firstEnemyDelay;
             trampolineReady = paused = false;
             duckDestination = null;
             selected = duck;
             phase = StagePhase.Placement;
-            message = "Select a character, then a cell. Press Start when ready.";
+            message = "ONE SHOT: survive until 00:00. The arena opens as time passes.";
             RefreshBoard();
+            UpdateCameraFrame(0, true);
             RefreshPresentation(0);
         }
 
@@ -88,7 +105,7 @@ namespace AlienAllIn
             { message = "Place duck and seal in different cells inside the board."; return; }
             phase = StagePhase.Running;
             selected = null;
-            message = "Complete both activities. Keep the duck safe.";
+            message = "Survive the five-minute run. Activities earn bonus cash.";
         }
 
         public void TogglePause() { if (phase == StagePhase.Running) paused = !paused; }
@@ -165,35 +182,32 @@ namespace AlienAllIn
             Advance(Time.deltaTime);
         }
 
-        // The same deterministic step is used by live play and scene integration tests.
         public void Advance(float dt)
         {
             if (phase == StagePhase.Running && !paused && dt > 0)
             {
-                elapsed += dt;
+                float step = Mathf.Min(dt, Mathf.Max(0, runDuration - elapsed));
+                elapsed += step;
+                UpdateTimedBoardSize();
                 RefreshBoard();
-                if (elapsed >= nextSpawn)
+                if (elapsed < runDuration && elapsed >= nextSpawn)
                 {
-                    if (enemies.FindAll(e => e && e.Alive).Count < maxEnemies) SpawnEnemy();
-                    nextSpawn = elapsed + spawnInterval;
+                    if (CountLivingEnemies() < maxEnemies) SpawnEnemy();
+                    nextSpawn = elapsed + CurrentSpawnInterval();
                 }
-                TickSeal(dt);
-                TickDuck(dt);
-                foreach (var enemy in enemies) if (enemy && enemy.Alive) TickEnemy(enemy, dt);
+                TickSeal(step);
+                TickDuck(step);
+                foreach (var enemy in enemies) if (enemy && enemy.Alive) TickEnemy(enemy, step);
                 RefreshBoard();
                 foreach (var activity in activities)
                 {
                     GridActor worker = activity.requiredKind == ActorKind.Duck ? duck : seal;
                     bool threatened = FindNearestEnemy(activity.transform.position, 1f) != null;
-                    cash += activity.Advance(dt, worker, threatened);
+                    cash += activity.Advance(step, worker, threatened);
                 }
-                if (!duck.Alive && !seal.Alive) { phase = StagePhase.Lost; message = "TEAM WIPED. Press R or RESTART to try a new placement."; }
-                else
-                {
-                    bool complete = activities.Length > 0;
-                    foreach (var activity in activities) complete &= activity.Complete;
-                    if (complete) { phase = StagePhase.Won; message = "SHIFT COMPLETE! Both activities finished. Press R to play again."; }
-                }
+                UpdateCameraFrame(step, false);
+                if (!duck.Alive && !seal.Alive) { phase = StagePhase.Lost; message = "RUN OVER — the team was wiped. Restart for another one-shot."; }
+                else if (elapsed >= runDuration) { phase = StagePhase.Won; message = "RUN COMPLETE — five minutes survived. Restart to play another run."; }
             }
             RefreshBoard();
             RefreshPresentation(paused || phase != StagePhase.Running ? 0 : dt);
@@ -237,8 +251,9 @@ namespace AlienAllIn
                 Vector3 away = seal.Alive ? (seal.transform.position - danger.transform.position).normalized : (duck.transform.position - danger.transform.position).normalized;
                 Vector3 shelter = seal.Alive ? seal.transform.position + away * board.cellSize : duck.transform.position + away * board.cellSize;
                 Vector3 local = board.transform.InverseTransformPoint(shelter);
-                local.x = Mathf.Clamp(local.x, .5f * board.cellSize, (board.width - .5f) * board.cellSize);
-                local.y = Mathf.Clamp(local.y, .5f * board.cellSize, (board.height - .5f) * board.cellSize);
+                Vector2Int minCell = board.ActiveMinCell;
+                local.x = Mathf.Clamp(local.x, (minCell.x + .5f) * board.cellSize, (minCell.x + board.ActiveWidth - .5f) * board.cellSize);
+                local.y = Mathf.Clamp(local.y, (minCell.y + .5f) * board.cellSize, (minCell.y + board.ActiveHeight - .5f) * board.cellSize);
                 shelter = board.transform.TransformPoint(local);
                 duck.State = Vector3.Distance(duck.transform.position, shelter) < .15f ? ActorState.Hiding : ActorState.Fleeing;
                 duck.MoveTowards(shelter, dt);
@@ -284,11 +299,68 @@ namespace AlienAllIn
 
         public GridActor SpawnEnemy()
         {
-            Vector2Int[] edges = { new Vector2Int(0, 5), new Vector2Int(6, board.height - 1), new Vector2Int(board.width - 1, 4), new Vector2Int(4, 0) };
-            GridActor enemy = Instantiate(enemyPrefab, board.CellCenter(edges[spawnIndex++ % edges.Length]), Quaternion.identity, enemyContainer);
-            enemy.name = $"Enemy {spawnIndex:00}";
-            enemy.board = board; enemy.ResetActor(); enemies.Add(enemy);
-            return enemy;
+            Vector2Int min = board.ActiveMinCell;
+            int centerX = min.x + (board.ActiveWidth - 1) / 2;
+            int centerY = min.y + (board.ActiveHeight - 1) / 2;
+            for (int attempt = 0; attempt < 4; attempt++)
+            {
+                int edge = (nextSpawnEdge + attempt) % 4;
+                Vector2Int cell = edge switch
+                {
+                    0 => new Vector2Int(min.x, centerY),
+                    1 => new Vector2Int(centerX, min.y + board.ActiveHeight - 1),
+                    2 => new Vector2Int(min.x + board.ActiveWidth - 1, centerY),
+                    _ => new Vector2Int(centerX, min.y)
+                };
+
+                BoardCell boardCell = board.GetCell(cell);
+                if (!boardCell || boardCell.Occupants.Count > 0) continue;
+                nextSpawnEdge = (edge + 1) % 4;
+                GridActor enemy = Instantiate(enemyPrefab, board.CellCenter(cell), Quaternion.identity, enemyContainer);
+                enemy.name = $"Enemy {++spawnIndex:00}";
+                enemy.board = board; enemy.ResetActor(); enemies.Add(enemy);
+                return enemy;
+            }
+
+            nextSpawnEdge = (nextSpawnEdge + 1) % 4;
+            return null;
+        }
+
+        void UpdateTimedBoardSize()
+        {
+            int maxSize = Mathf.Min(board.width, board.height);
+            int targetSize = StageProgress < .20f ? openingBoardSize :
+                StageProgress < .50f ? middleBoardSize :
+                StageProgress < .80f ? lateBoardSize : maxSize;
+            targetSize = Mathf.Clamp(targetSize, 1, maxSize);
+            if (board.SetActiveSize(targetSize, targetSize))
+                message = $"ARENA EXPANDED — {board.ActiveWidth} × {board.ActiveHeight}.";
+        }
+
+        float CurrentSpawnInterval() => Mathf.Lerp(spawnInterval, lateSpawnInterval, StageProgress);
+
+        int CountLivingEnemies()
+        {
+            int count = 0;
+            foreach (GridActor enemy in enemies) if (enemy && enemy.Alive) count++;
+            return count;
+        }
+
+        void UpdateCameraFrame(float dt, bool immediate)
+        {
+            if (!gameCamera || !board) return;
+            float targetSize = maxBoardCameraSize * Mathf.Max(board.ActiveWidth, board.ActiveHeight) / Mathf.Max(board.width, board.height);
+            Vector3 center = board.ActiveCenter;
+            Vector3 targetPosition = new Vector3(center.x, center.y, gameCamera.transform.position.z);
+            if (immediate)
+            {
+                gameCamera.orthographicSize = targetSize;
+                gameCamera.transform.position = targetPosition;
+                return;
+            }
+
+            gameCamera.orthographicSize = Mathf.MoveTowards(gameCamera.orthographicSize, targetSize, cameraScaleSpeed * dt);
+            gameCamera.transform.position = Vector3.MoveTowards(gameCamera.transform.position, targetPosition, cameraScaleSpeed * dt);
         }
 
         GridActor FindNearestEnemy(Vector3 point, float radius)

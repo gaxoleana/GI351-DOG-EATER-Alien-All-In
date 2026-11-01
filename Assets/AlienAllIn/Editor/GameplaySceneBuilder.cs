@@ -75,7 +75,7 @@ namespace AlienAllIn.Editor
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = Ink;
 
-            BoardGrid board = new GameObject("Board - 10 x 10 - 1 unit cells").AddComponent<BoardGrid>();
+            BoardGrid board = new GameObject("Board").AddComponent<BoardGrid>();
             board.transform.position = new Vector3(-5, -5);
             for (int y = 0; y < 10; y++)
             for (int x = 0; x < 10; x++)
@@ -88,28 +88,30 @@ namespace AlienAllIn.Editor
                 cell.surface = Shape("Surface", tile.transform, square, Vector2.zero, new Vector2(.96f, .96f), cell.baseColor, 0);
             }
             board.RebuildIndex();
-            Transform allies = new GameObject("Team - move these objects to change starting cells").transform;
+            Transform allies = new GameObject("Team").transform;
             GridActor duck = MakeActor("Duck", ActorKind.Duck, allies);
             duck.board = board; duck.maxHealth = 25; duck.moveSpeed = 2.7f;
-            duck.transform.position = board.CellCenter(new Vector2Int(2, 2));
+            duck.transform.position = board.CellCenter(new Vector2Int(4, 4));
             GridActor seal = MakeActor("Seal", ActorKind.Seal, allies);
             seal.board = board; seal.maxHealth = 45; seal.damage = 4; seal.attackRange = 2.7f; seal.attackInterval = .75f;
-            seal.transform.position = board.CellCenter(new Vector2Int(5, 5));
+            seal.transform.position = board.CellCenter(new Vector2Int(5, 4));
             GridActor enemy = MakeActor("Enemy", ActorKind.Enemy, null);
             enemy.maxHealth = 10; enemy.moveSpeed = .8f; enemy.damage = 3; enemy.attackRange = .65f; enemy.attackInterval = 1.2f;
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(enemy.gameObject, "Assets/AlienAllIn/Prefabs/Enemy.prefab");
             Object.DestroyImmediate(enemy.gameObject);
-            Transform enemies = new GameObject("Enemies - spawned during the shift").transform;
-            Transform activityRoot = new GameObject("Activities - move stations to other cell centers").transform;
-            ActivityStation casino = MakeActivity("CASINO", ActorKind.Duck, board, new Vector2Int(4, 5), 36, activityRoot);
-            ActivityStation rope = MakeActivity("JUMP ROPE", ActorKind.Seal, board, new Vector2Int(5, 5), 42, activityRoot);
-            Transform pickupRoot = new GameObject("Pickups - duck collects these").transform;
+            Transform enemies = new GameObject("Enemies").transform;
+            Transform activityRoot = new GameObject("Activities").transform;
+            ActivityStation casino = MakeActivity("CASINO", ActorKind.Duck, board, new Vector2Int(4, 6), 36, activityRoot);
+            ActivityStation rope = MakeActivity("JUMP ROPE", ActorKind.Seal, board, new Vector2Int(6, 6), 42, activityRoot);
+            Transform pickupRoot = new GameObject("Pickups").transform;
             FieldPickup pickup = new GameObject("Trampoline supply", typeof(FieldPickup)).GetComponent<FieldPickup>();
-            pickup.transform.SetParent(pickupRoot); pickup.transform.position = board.CellCenter(new Vector2Int(2, 3));
+            pickup.transform.SetParent(pickupRoot); pickup.transform.position = board.CellCenter(new Vector2Int(6, 4));
             Shape("Supply marker", pickup.transform, ring, Vector2.zero, new Vector2(.54f, .54f), Mint, 3);
 
-            GameplayController game = new GameObject("Gameplay - balance and scene references").AddComponent<GameplayController>();
+            GameplayController game = new GameObject("Game Controller").AddComponent<GameplayController>();
             game.board = board; game.gameCamera = camera; game.duck = duck; game.seal = seal;
+            game.runDuration = 300; game.openingBoardSize = 3; game.middleBoardSize = 5; game.lateBoardSize = 7;
+            game.maxBoardCameraSize = camera.orthographicSize;
             game.enemyPrefab = prefab.GetComponent<GridActor>(); game.enemyContainer = enemies;
             game.activities = new[] { casino, rope }; game.pickups = new[] { pickup };
             game.hud = MakeHUD(game);
@@ -215,7 +217,7 @@ namespace AlienAllIn.Editor
 
         static GameplayHUD MakeHUD(GameplayController game)
         {
-            var canvasObject = new GameObject("HUD - editable Canvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster), typeof(GameplayHUD));
+            var canvasObject = new GameObject("HUD", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster), typeof(GameplayHUD));
             var canvas = canvasObject.GetComponent<Canvas>(); canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             var scaler = canvasObject.GetComponent<CanvasScaler>(); scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1600, 900); scaler.matchWidthOrHeight = .5f;
@@ -248,7 +250,7 @@ namespace AlienAllIn.Editor
 
             hud.duckButton = Button("DUCK", parent, .745f, .34f, .854f, .386f, Raised, Muted, 15);
             hud.sealButton = Button("SEAL", parent, .866f, .34f, .975f, .386f, Raised, Muted, 15);
-            hud.startButton = Button("START SHIFT", parent, .745f, .225f, .975f, .275f, Mint, Ink, 18, "Start Shift");
+            hud.startButton = Button("START RUN", parent, .745f, .225f, .975f, .275f, Mint, Ink, 18, "Start Run");
             hud.trampolineButton = Button("", parent, .745f, .166f, .975f, .216f, new Color(.52f, .81f, .93f), Ink, 15, "Use Trampoline");
             hud.toolText = hud.trampolineButton.GetComponentInChildren<Text>();
             hud.pauseButton = Button("PAUSE", parent, .745f, .112f, .854f, .157f, Raised, Cream, 14);

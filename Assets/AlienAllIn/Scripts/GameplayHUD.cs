@@ -37,9 +37,13 @@ namespace AlienAllIn
 
         public void Refresh()
         {
-            phaseText.text = game.Paused ? "PAUSED" : game.Phase == StagePhase.Placement ? "READY" : game.Phase == StagePhase.Won ? "SHIFT COMPLETE" : game.Phase == StagePhase.Lost ? "TEAM WIPED" : $"ON SHIFT   {game.Elapsed:0}s";
+            string boardSize = $"{game.ActiveBoardWidth}×{game.ActiveBoardHeight}";
+            phaseText.text = game.Phase == StagePhase.Placement ? $"READY   {FormatClock(game.runDuration)}   |   {boardSize}" :
+                game.Phase == StagePhase.Won ? "RUN COMPLETE" :
+                game.Phase == StagePhase.Lost ? "RUN FAILED" :
+                $"{(game.Paused ? "PAUSED   " : "")}{FormatClock(game.TimeRemaining)}   |   {boardSize}";
             cashText.text = game.Cash.ToString("000");
-            objectiveText.text = "OBJECTIVES";
+            objectiveText.text = "SIDE JOBS";
 
             if (activityRows != null)
             {
@@ -109,6 +113,12 @@ namespace AlienAllIn
 
             Text label = button.GetComponentInChildren<Text>();
             if (label) label.color = selected ? new Color(.045f, .075f, .13f) : new Color(.70f, .82f, .81f);
+        }
+
+        static string FormatClock(float seconds)
+        {
+            int totalSeconds = Mathf.Max(0, Mathf.CeilToInt(seconds));
+            return $"{totalSeconds / 60:00}:{totalSeconds % 60:00}";
         }
     }
 }
