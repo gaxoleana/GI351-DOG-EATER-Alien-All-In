@@ -52,6 +52,17 @@ namespace AlienAllIn.Editor
             data.FindProperty("optionsClose").objectReferenceValue = close;
             data.FindProperty("optionsResume").objectReferenceValue = resume;
             data.FindProperty("optionsRestart").objectReferenceValue = restart; options.SetActive(false);
+            var shop = Panel("Chip Exchange Shop", canvas, new Rect(.38f,.28f,.30f,.42f));
+            data.FindProperty("shopPanel").objectReferenceValue = shop;
+            data.FindProperty("shopButton").objectReferenceValue = Button("Shop", header, new Rect(.73f,.04f,.11f,.32f), "Shop");
+            data.FindProperty("shopClose").objectReferenceValue = Button("Close", shop.transform, new Rect(.84f,.83f,.12f,.12f), "X");
+            data.FindProperty("exchangeOne").objectReferenceValue = Button("Exchange One", shop.transform, new Rect(.08f,.43f,.84f,.10f), "1 Chip -> 1 Coin");
+            data.FindProperty("exchangeAll").objectReferenceValue = Button("Exchange All", shop.transform, new Rect(.08f,.31f,.84f,.10f), "All Chips -> Coins");
+            data.FindProperty("exchangeCoinOne").objectReferenceValue = Button("Exchange Coin One", shop.transform, new Rect(.08f,.19f,.84f,.10f), "1 Coin -> 1 Chip");
+            data.FindProperty("exchangeCoinAll").objectReferenceValue = Button("Exchange Coin All", shop.transform, new Rect(.08f,.07f,.84f,.10f), "All Coins -> Chips");
+            Label("Shop Title", shop.transform, new Rect(.08f,.82f,.70f,.14f), "CHIP EXCHANGE");
+            data.FindProperty("shopBalance").objectReferenceValue = Label("Exchange Balance", shop.transform, new Rect(.08f,.56f,.84f,.22f), "Chips 0    Coins 0\n1 Chip = 1 Coin");
+            shop.SetActive(false);
             var old = game.transform.Find("Board Feedback"); if (old) Object.DestroyImmediate(old.gameObject);
             var root = new GameObject("Board Feedback"); root.transform.SetParent(game.transform,false);
             var feedback = root.AddComponent<BoardInteractionFeedback>(); feedback.board = board; feedback.stageCamera = camera; feedback.ui = ui; feedback.systems = game;
@@ -70,6 +81,14 @@ namespace AlienAllIn.Editor
         static GameObject Panel(string name, Transform parent, Rect bounds)
         {
             var go = new GameObject(name,typeof(RectTransform),typeof(Image)); go.transform.SetParent(parent,false); Set((RectTransform)go.transform,bounds); go.GetComponent<Image>().color = new Color(.85f,.85f,.85f); return go;
+        }
+        static Text Label(string name, Transform parent, Rect bounds, string title)
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(Text));
+            go.transform.SetParent(parent, false); Set((RectTransform)go.transform, bounds);
+            var text = go.GetComponent<Text>(); text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            text.fontSize = 22; text.color = Color.black; text.alignment = TextAnchor.MiddleCenter;
+            text.text = title; text.raycastTarget = false; return text;
         }
         static Button Button(string name, Transform parent, Rect bounds, string title)
         {

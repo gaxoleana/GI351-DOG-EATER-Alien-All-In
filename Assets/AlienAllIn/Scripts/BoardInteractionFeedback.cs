@@ -33,13 +33,23 @@ namespace AlienAllIn
         void LateUpdate()
         {
             Restore();
+            var selected = ui.CharacterPopupOpen ? ui.SelectedActor : null;
+            if (selected && selected.Alive)
+            {
+                DragCell = null;
+                hoverOutline.enabled = true;
+                Box(hoverOutline, selected.transform.position, .55f, hoverColor);
+                dragOutline.enabled = false;
+                ShowSelectedRange(selected);
+                return;
+            }
             if (rangeTime > 0)
             {
                 foreach (var cell in board.GetComponentsInChildren<BoardCell>())
                     if (SealGridRange.Contains(cell.coordinate - rangeCenter, enhanced)) { Paint(cell, rangeColor); RangeCellCount++; }
                 rangeTime -= Time.deltaTime;
             }
-            bool blocked = ui.CharacterPopupOpen || ui.OptionsOpen || (ui.GetComponent<MainDebugPanel>() && ui.GetComponent<MainDebugPanel>().IsOpen);
+            bool blocked = ui.ShopOpen || ui.CharacterPopupOpen || ui.OptionsOpen || (ui.GetComponent<MainDebugPanel>() && ui.GetComponent<MainDebugPanel>().IsOpen);
             var mouse = Mouse.current;
             var actor = !blocked && mouse != null ? ui.ActorAtScreenPoint(mouse.position.ReadValue()) : null;
             hoverOutline.enabled = actor && !dragged;
@@ -53,6 +63,32 @@ namespace AlienAllIn
             Color color = valid ? validColor : invalidColor;
             Paint(board.GetCell(coordinate), color); dragOutline.enabled = true;
             Box(dragOutline, board.CellCenter(coordinate), .48f, color);
+        }
+        void ShowSelectedRange(GridActor selected)
+        {
+            if (selected.kind == ActorKind.Duck) return;
+            board.TryWorldToCell(selected.transform.position, out var center);
+            float radius = systems.GetAttackPreviewRadius(selected);
+            bool gridRange = selected.kind == ActorKind.Seal;
+            foreach (var cell in board.GetComponentsInChildren<BoardCell>())
+            {
+                if (!cell.IsUnlocked) continue;
+                bool inRange = gridRange
+                    ? SealGridRange.Contains(cell.coordinate - center, selected.IsUltimateActive)
+                    : Vector3.Distance(board.CellCenter(cell.coordinate), selected.transform.position) <= radius;
+                if (inRange) { Paint(cell, rangeColor); RangeCellCount++; }
+            }
+            if (gridRange) return;
+            // A world-space circle matches the distance checks used for Cat and Puffer targeting.
+            dragOutline.enabled = true;
+            dragOutline.loop = true;
+            dragOutline.positionCount = 64;
+            dragOutline.startColor = dragOutline.endColor = rangeColor;
+            for (int i = 0; i < 64; i++)
+            {
+                float angle = i * Mathf.PI * 2f / 64;
+                dragOutline.SetPosition(i, selected.transform.position + new Vector3(Mathf.Cos(angle), Mathf.Sin(angle)) * radius);
+            }
         }
         void Paint(BoardCell cell, Color color) { cell.Highlight(color); painted.Add(cell); }
         void Box(LineRenderer line, Vector3 center, float radius, Color color)

@@ -40,6 +40,7 @@ namespace AlienAllIn
             if (!IsOpen)
             {
                 var ui = GetComponent<MainCoreGameplayUI>();
+                if (ui && ui.ShopOpen) ui.CloseShop();
                 ui?.CloseCharacter();
                 if (ui && ui.OptionsOpen) ui.CloseOptions();
             }

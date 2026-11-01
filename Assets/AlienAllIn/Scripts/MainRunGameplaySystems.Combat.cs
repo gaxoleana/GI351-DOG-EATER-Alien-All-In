@@ -59,6 +59,22 @@ namespace AlienAllIn
         [SerializeField, Min(.1f)] float ultimateChargePerDamage = 30f;
         [SerializeField, Min(.1f)] float sealUltimateDuration = 3f;
         [SerializeField, Min(.1f)] float catLaserReach = 10f;
+
+        // Shared by the selection preview; combat keeps using these same source values.
+        public float GetAttackPreviewRadius(GridActor actor)
+        {
+            if (!actor || actor.kind == ActorKind.Duck || actor.kind == ActorKind.Seal) return 0f;
+            return actor.kind == ActorKind.Cat && actor.IsUltimateActive ? catLaserReach : actor.attackRange;
+        }
+
+        public string GetAttackRangeDescription(GridActor actor)
+        {
+            if (!actor || actor.kind == ActorKind.Duck) return "No attack";
+            if (actor.kind == ActorKind.Seal)
+                return actor.IsUltimateActive ? "Ultimate: 5x5, corners excluded" : "Attack: 3x3 cells";
+            string label = actor.kind == ActorKind.Pufferfish ? "Lock-on range" : actor.IsUltimateActive ? "Ultimate sweep reach" : "Attack range";
+            return $"{label}: {GetAttackPreviewRadius(actor):0.0} units";
+        }
         [SerializeField, Min(.01f)] float toasterProjectileRadius = .12f;
         [SerializeField, Range(.01f, .5f)] float roasterEatAtHealthFraction = .2f;
         [SerializeField, Min(.1f)] float roasterEatDurationSeconds = .75f;

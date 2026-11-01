@@ -10,6 +10,26 @@ namespace AlienAllIn
         public int Chips => chips;
         public float AttackUpgradeAmount => damageUpgradeAmount;
 
+        public bool TryExchangeChipsForCoins(int amount)
+            => TryExchangeCurrency(amount, true);
+
+        public bool TryExchangeCoinsForChips(int amount)
+            => TryExchangeCurrency(amount, false);
+
+        bool TryExchangeCurrency(int amount, bool chipsToCoins)
+        {
+            if (!runLoop || (runLoop.State != RunState.Placement && runLoop.State != RunState.Running && runLoop.State != RunState.Paused)) return false;
+            int source = chipsToCoins ? chips : coins;
+            int destination = chipsToCoins ? coins : chips;
+            if (amount <= 0 || amount > source || destination > int.MaxValue - amount) return false;
+            if (chipsToCoins) { chips -= amount; coins += amount; }
+            else { coins -= amount; chips += amount; }
+            string from = chipsToCoins ? "Chips" : "Coins";
+            string to = chipsToCoins ? "Coins" : "Chips";
+            SetStatusFromUI($"Exchanged {amount} {from} for {amount} {to}.");
+            return true;
+        }
+
         void ResetEconomyForNewRun()
         {
             Array.Clear(itemInventory, 0, itemInventory.Length);

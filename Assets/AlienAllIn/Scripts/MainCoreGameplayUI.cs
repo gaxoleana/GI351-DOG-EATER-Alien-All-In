@@ -21,6 +21,13 @@ namespace AlienAllIn
         [SerializeField] GameObject optionsPanel;
         [SerializeField] Button optionsResume, optionsRestart, optionsClose;
         bool resumeAfterOptions;
+        [Header("Chip exchange shop")]
+        [SerializeField] GameObject shopPanel;
+        [SerializeField] Button shopButton, shopClose, exchangeOne, exchangeAll;
+        [SerializeField] Button exchangeCoinOne, exchangeCoinAll;
+        [SerializeField] Text shopBalance;
+        bool resumeAfterShop;
+        public bool ShopOpen => shopPanel && shopPanel.activeSelf;
         public BoardInteractionFeedback Feedback => feedback;
         public bool OptionsOpen => optionsPanel && optionsPanel.activeSelf;
         [SerializeField] bool enableDebugInReleaseBuild;
@@ -64,6 +71,13 @@ namespace AlienAllIn
             optionsResume.onClick.AddListener(CloseOptions);
             optionsClose.onClick.AddListener(CloseOptions);
             optionsRestart.onClick.AddListener(() => runLoop.Restart());
+            shopPanel.SetActive(false);
+            shopButton.onClick.AddListener(OpenShop);
+            shopClose.onClick.AddListener(CloseShop);
+            exchangeOne.onClick.AddListener(() => ExchangeChips(1));
+            exchangeAll.onClick.AddListener(() => ExchangeChips(systems.Chips));
+            exchangeCoinOne.onClick.AddListener(() => ExchangeCoins(1));
+            exchangeCoinAll.onClick.AddListener(() => ExchangeCoins(systems.Coins));
             playAgain.onClick.AddListener(() => runLoop.Restart());
             popupOutside.onClick.AddListener(CloseCharacter);
             popupClose.onClick.AddListener(CloseCharacter);
@@ -90,12 +104,42 @@ namespace AlienAllIn
             if (runLoop) { runLoop.RunRestarted -= HandleRestart; runLoop.RunEnded -= HandleEnded; runLoop.InteractionModalOpen = false; }
             if (screenLayout) screenLayout.FocusActor(null);
         }
-        void HandleRestart() { if (optionsPanel) optionsPanel.SetActive(false); resumeAfterOptions = false; DismissCharacter(false); RefreshUI(); }
-        void HandleEnded(RunState state) { DismissCharacter(false); RefreshUI(); }
+        void HandleRestart() { if (optionsPanel) optionsPanel.SetActive(false); shopPanel.SetActive(false); resumeAfterShop = false; resumeAfterOptions = false; DismissCharacter(false); RefreshUI(); }
+        void HandleEnded(RunState state) { shopPanel.SetActive(false); resumeAfterShop = false; DismissCharacter(false); RefreshUI(); }
+
+        public void OpenShop()
+        {
+            if (ShopOpen || OptionsOpen || CharacterPopupOpen || debugPanel && debugPanel.IsOpen ||
+                runLoop.State == RunState.Defeated || runLoop.State == RunState.RunComplete) return;
+            resumeAfterShop = runLoop.State == RunState.Running;
+            if (resumeAfterShop) runLoop.Pause();
+            runLoop.InteractionModalOpen = true;
+            shopPanel.SetActive(true);
+            shopPanel.transform.SetAsLastSibling();
+            RefreshUI();
+        }
+        public void CloseShop()
+        {
+            if (!ShopOpen) return;
+            shopPanel.SetActive(false);
+            runLoop.InteractionModalOpen = false;
+            if (resumeAfterShop && runLoop.State == RunState.Paused) runLoop.Resume();
+            resumeAfterShop = false;
+        }
+        void ExchangeChips(int amount)
+        {
+            systems.TryExchangeChipsForCoins(amount);
+            RefreshUI();
+        }
+        void ExchangeCoins(int amount)
+        {
+            systems.TryExchangeCoinsForChips(amount);
+            RefreshUI();
+        }
 
         public void OpenCharacter(GridActor actor)
         {
-            if (OptionsOpen || !actor || !actor.Alive || debugPanel && debugPanel.IsOpen ||
+            if (ShopOpen || OptionsOpen || !actor || !actor.Alive || debugPanel && debugPanel.IsOpen ||
                 runLoop.State == RunState.Defeated || runLoop.State == RunState.RunComplete) return;
             if (!CharacterPopupOpen) resumeAfterPopup = runLoop.State == RunState.Running;
             selectedActor = actor;
@@ -126,6 +170,7 @@ namespace AlienAllIn
         }
         public void OpenOptions()
         {
+            if (ShopOpen) return;
             CloseCharacter(); resumeAfterOptions = runLoop.State == RunState.Running;
             if (resumeAfterOptions) runLoop.Pause();
             runLoop.InteractionModalOpen = true; optionsPanel.SetActive(true);
@@ -137,11 +182,13 @@ namespace AlienAllIn
         }
         void TogglePause()
         {
+            if (ShopOpen || CharacterPopupOpen || OptionsOpen) return;
             if (runLoop.State == RunState.Running) runLoop.Pause();
             else if (runLoop.State == RunState.Paused) runLoop.Resume();
         }
         void Update()
         {
+            if (ShopOpen && Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame) CloseShop();
             if (OptionsOpen && Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame) CloseOptions();
             if (CharacterPopupOpen && Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame) CloseCharacter();
             refreshClock -= Time.unscaledDeltaTime;
@@ -163,6 +210,12 @@ namespace AlienAllIn
             int seconds = Mathf.CeilToInt(runLoop.TimeRemainingSeconds);
             runText.text = $"Grid {board.ActiveWidth}x{board.ActiveHeight}    {seconds / 60:00}:{seconds % 60:00}";
             walletText.text = $"Coins  {systems.Coins}     Chips  {systems.Chips}";
+            shopBalance.text = $"Chips {systems.Chips}    Coins {systems.Coins}\n1 Chip = 1 Coin";
+            exchangeOne.interactable = systems.Chips > 0 && systems.Coins < int.MaxValue;
+            exchangeAll.interactable = systems.Chips > 0 && systems.Coins <= int.MaxValue - systems.Chips;
+            exchangeCoinOne.interactable = systems.Coins > 0 && systems.Chips < int.MaxValue;
+            exchangeCoinAll.interactable = systems.Coins > 0 && systems.Chips <= int.MaxValue - systems.Coins;
+            shopButton.interactable = !OptionsOpen && !CharacterPopupOpen && runLoop.State != RunState.RunComplete && runLoop.State != RunState.Defeated;
             scoreText.text = $"Score  {systems.Score}";
             statusText.text = systems.DuckCaptured ? $"Duck kidnapped! Rescue in {systems.DuckRescueRemaining:0}s" : systems.StatusMessage;
             for (int i = 0; i < cardActors.Length; i++)
@@ -191,12 +244,14 @@ namespace AlienAllIn
             int price = systems.GetAttackUpgradeCost(selectedActor);
             popupDetails.text = isDuck ? (systems.DuckCaptured ? $"Rescue within {systems.DuckRescueRemaining:0}s\nRansom: {systems.DuckRansomChips} Chips" : "Duck cannot take HP damage.\nEnemies can kidnap it.") :
                 $"ATK +{systems.AttackUpgradeAmount:0.0}    Level {selectedActor.DamageUpgradeRank}\nCoins: {systems.Coins}   Next: {(price == int.MaxValue ? "MAX" : price.ToString())}";
+            popupDetails.text += "\n" + systems.GetAttackRangeDescription(selectedActor);
             popupAction.text = isDuck ? $"Free the Duck  ({systems.DuckRansomChips} Chips)" : $"Upgrade  ({price} Coins)";
             popupUpgrade.gameObject.SetActive(!isDuck || systems.DuckCaptured);
             popupUpgrade.interactable = isDuck ? systems.DuckCaptured && systems.Chips >= systems.DuckRansomChips : price < int.MaxValue && systems.Coins >= price;
         }
         public GridActor ActorAtScreenPoint(Vector2 screen)
         {
+            if (ShopOpen) return null;
             if (!stageCamera.pixelRect.Contains(screen)) return null;
             Vector3 point = stageCamera.ScreenToWorldPoint(new Vector3(screen.x, screen.y, -stageCamera.transform.position.z));
             GridActor nearest = null; float best = .55f * board.cellSize;
@@ -211,13 +266,13 @@ namespace AlienAllIn
         }
         internal bool TryDropActor(GridActor actor, Vector2 screenPosition)
         {
-            if (OptionsOpen || CharacterPopupOpen || !stageCamera.pixelRect.Contains(screenPosition) || !actor) return false;
+            if (ShopOpen || OptionsOpen || CharacterPopupOpen || !stageCamera.pixelRect.Contains(screenPosition) || !actor) return false;
             Vector3 world = stageCamera.ScreenToWorldPoint(new Vector3(screenPosition.x, screenPosition.y, -stageCamera.transform.position.z));
             return board.TryWorldToCell(world, out Vector2Int cell) && systems.TryOrderMove(actor, cell);
         }
         internal bool TryDropOnActor(UIResourceDragToken token, GridActor target)
         {
-            if (!token || !target || OptionsOpen || CharacterPopupOpen) return false;
+            if (!token || !target || ShopOpen || OptionsOpen || CharacterPopupOpen) return false;
             if (token.Payload == UIDragPayload.Item) return systems.TryUseItem(token.Item, target);
             return token.Payload == UIDragPayload.Actor && systems.TryActivateUltimateSwitch(token.Actor, target);
         }
