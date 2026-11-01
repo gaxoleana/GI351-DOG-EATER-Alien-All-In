@@ -22,6 +22,10 @@ namespace AlienAllIn
         [SerializeField, Min(1)] int middleSize = 5;
         [SerializeField, Min(1)] int lateSize = 7;
 
+        [Header("Prototype run duration")]
+        [SerializeField, Min(1f), Tooltip("Prototype only. The GDD leaves the final run duration undecided.")]
+        float runDurationSeconds = 300f;
+
         [Header("Prototype run-progress milestones")]
         [SerializeField, Range(0f, 1f)] float expandToMiddleAt = .25f;
         [SerializeField, Range(0f, 1f)] float expandToLateAt = .5f;
@@ -33,6 +37,7 @@ namespace AlienAllIn
         readonly List<Vector2Int> processSpawnCandidates = new List<Vector2Int>(100);
 
         public BoardGrid Board => board;
+        public float RunDurationSeconds => Mathf.Max(1f, runDurationSeconds);
         public IReadOnlyList<Vector2Int> PlayerStartCells => playerStartCells ?? Array.Empty<Vector2Int>();
         public IReadOnlyList<Vector2Int> ProcessSpawnCandidates
         {
@@ -51,6 +56,7 @@ namespace AlienAllIn
             openingSize = Mathf.Max(1, openingSize);
             middleSize = Mathf.Max(openingSize, middleSize);
             lateSize = Mathf.Max(middleSize, lateSize);
+            runDurationSeconds = Mathf.Max(1f, runDurationSeconds);
             expandToMiddleAt = Mathf.Clamp01(expandToMiddleAt);
             expandToLateAt = Mathf.Max(expandToMiddleAt, Mathf.Clamp01(expandToLateAt));
             expandToFullAt = Mathf.Max(expandToLateAt, Mathf.Clamp01(expandToFullAt));

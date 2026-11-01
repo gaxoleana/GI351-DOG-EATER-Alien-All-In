@@ -7253,6 +7253,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1371843181}
   - component: {fileID: 1371843180}
+  - component: {fileID: 1371843182}
   m_Layer: 0
   m_Name: Stage 1
   m_TagString: Untagged
@@ -7278,6 +7279,7 @@ MonoBehaviour:
   openingSize: 3
   middleSize: 5
   lateSize: 7
+  runDurationSeconds: 300
   expandToMiddleAt: 0.25
   expandToLateAt: 0.5
   expandToFullAt: 0.75
@@ -7298,6 +7300,25 @@ Transform:
   - {fileID: 446845524}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1371843182
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1371843179}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 98f5dfe01c8f45909e94601b4fa46ee0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: AlienAllIn.Runtime::AlienAllIn.RunLoopController
+  stage: {fileID: 1371843180}
+  survivingAliens: []
+  resetActors: []
+  activities: []
+  pickups: []
+  state: 0
+  elapsedSeconds: 0
 --- !u!1 &1410197195
 GameObject:
   m_ObjectHideFlags: 0

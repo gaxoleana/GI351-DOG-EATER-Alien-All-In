@@ -4,15 +4,29 @@
 
 `Assets/Scenes/Main.unity` is the first enabled Build Settings scene. It contains
 the Stage 1 board shell: a 10x10 `BoardGrid`, with a 3x3 area open at 0% run
-progress and locked cells visible in a darker color. It intentionally has no
-actors, Process machines, combat, or run timer.
+progress and locked cells visible in a darker color. `RunLoopController` starts
+and pauses the run, shows a basic timer/status panel, and restarts the stage. It
+does not add actors, Process machines, combat, or resources.
 
-`StageGridProgression.ApplyRunProgress` accepts normalized progress from a
-future run system. Prototype thresholds open 5x5 at 25%, 7x7 at 50%, and the
-full 10x10 board at 75%. It exposes optional authored player start cells and
-the currently open cells as potential Process spawn candidates. The candidate
-list does not spawn machines, choose their type, or filter occupied cells.
-`playerStartCells` is empty until a starting formation is specified.
+`StageGridProgression` is the single Main-scene source for the prototype run
+duration (300 seconds) and grid milestones. The GDD leaves the final duration
+and expansion milestones open. Prototype thresholds open 5x5 at 25%, 7x7 at
+50%, and the full 10x10 board at 75%. The run loop reads progress from its one
+elapsed-time clock. It exposes optional authored player start cells and the
+currently open cells as potential Process spawn candidates. Candidates do not
+spawn machines, choose their type, or filter occupied cells.
+`playerStartCells` and the surviving-alien roster are empty until a team/placement
+system is specified. Register aliens with `RunLoopController.RegisterSurvivor`
+when that system is connected; a configured team wipe ends the run as Defeated.
+With no roster connected, the UI says so and the loop cannot infer alien deaths.
+Process completion is not a run-end condition.
+
+Space starts from Placement and pauses/resumes while running; R restarts. Pause
+and terminal states set Unity's scaled game time to zero. Restart restores the
+authored actor positions/state and any optional activities or pickups wired to
+the controller, then returns the grid to its opening area. The final-frame tie
+rule checks team elimination before timeout, matching the existing Gameplay
+prototype's outcome order.
 
 `Assets/Scenes/Gameplay.unity` remains the playable duck + seal reference scene
 described below; it was kept separate from the Stage 1 entry scene.

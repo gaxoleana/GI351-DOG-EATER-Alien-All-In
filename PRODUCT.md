@@ -27,9 +27,11 @@ The game combines automated alien behavior with tactical placement, activity pro
 
 `Assets/Scenes/Main.unity` is the first enabled Build Settings scene and contains
 the Stage 1 board shell: a 10x10 `BoardGrid`, one world unit per cell, and a 3x3
-opening area. `StageGridProgression` accepts normalized run progress and expands
-to 5x5, 7x7, then 10x10 using editable prototype thresholds. Actors, a run timer,
-and Process machines are not part of this scene yet.
+opening area. `RunLoopController` provides Placement, Running, Paused,
+RunComplete, and Defeated states, a prototype timer, and reset hooks. Its alien
+roster is not connected yet. `StageGridProgression` owns the prototype duration
+and expansion thresholds; the final values remain open. Process machines and
+combat are not part of this scene yet.
 
 `Assets/Scenes/Gameplay.unity` remains the playable duck + seal reference with
 fixed casino and jump-rope activities, enemies, supplies, Switch relocation,
