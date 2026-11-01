@@ -4,11 +4,12 @@
 
 ## Platform
 
-web (for this playable prototype only; the final game's release platform is undecided)
+Unity gameplay prototype; the final game's release platform is undecided.
 
 ## Stack
 
-Plain single-file HTML, CSS, and JavaScript for a local browser prototype, as requested.
+Unity 6000.5.10f1, C#, URP 2D, the Input System and an editable uGUI Canvas.
+The browser demo remains a gameplay reference.
 
 ## Users
 
@@ -24,7 +25,11 @@ The game combines automated alien behavior with tactical placement, activity pro
 
 ## Operating Context
 
-The current request is for a small, playable HTML demonstration used to compare the assistant's understanding of the GDD with the user's intent. It is not the implementation architecture for the Unity game. The user confirmed a 10x10 grid for this prototype.
+The current request is an editable Unity gameplay scene with a 10x10 board,
+one world unit per cell, a duck, reliable cell occupancy and a playable core loop.
+`Assets/Scenes/Gameplay.unity` implements a duck + seal stage with fixed casino
+and jump-rope activities, enemies, supplies, Switch relocation and win/lose/reset.
+See `GAMEPLAY.md` for controls, Inspector fields, verification and scope.
 
 ## Capabilities and Constraints
 
@@ -46,8 +51,9 @@ The current request is for a small, playable HTML demonstration used to compare 
 
 ## Evidence on Hand
 
-- User-provided GDD: `C:/Users/User/Downloads/Alien All In.pdf`.
-- No approved character art, sound, or visual reference files were provided for this HTML prototype. Do not imply prototype placeholder visuals are final assets.
+- User-provided GDD: `Alien All In.pdf` (attached to the Codex chat).
+- Playable reference: https://seal-the-deal-arcade-1030.toonender.chatgpt.site/
+- The Unity scene uses simple geometric sprite placeholders, not final art.
 
 ## Product Principles
 

@@ -1,0 +1,6 @@
+{
+  "name": "AlienAllIn.EditorTests",
+  "references": ["AlienAllIn.Runtime", "AlienAllIn.Editor", "UnityEngine.UI"],
+  "includePlatforms": ["Editor"],
+  "optionalUnityReferences": ["TestAssemblies"]
+}

@@ -1,0 +1,5 @@
+{
+  "name": "AlienAllIn.PlayModeTests",
+  "references": ["AlienAllIn.Runtime", "UnityEngine.UI"],
+  "optionalUnityReferences": ["TestAssemblies"]
+}

@@ -1,0 +1,5 @@
+{
+  "name": "AlienAllIn.Runtime",
+  "rootNamespace": "AlienAllIn",
+  "references": ["Unity.InputSystem", "UnityEngine.UI"]
+}
