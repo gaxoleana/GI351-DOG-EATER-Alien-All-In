@@ -1,0 +1,1464 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#201b3c">
+  <title>Alien All In — Arcade Defense</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #201b3c;
+      --ink-deep: #17142c;
+      --plum: #342b5a;
+      --plum-soft: #4b4075;
+      --cream: #f4e8c9;
+      --paper: #fff6df;
+      --paper-ink: #2b2248;
+      --muted: #b7afcf;
+      --line: #605783;
+      --pink: #fa6c9f;
+      --orange: #ffb44d;
+      --aqua: #62e2d1;
+      --lime: #c8ef67;
+      --danger: #ff676c;
+      --board-size: min(100%, 64vh);
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      font-synthesis: none;
+      text-rendering: optimizeLegibility;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--ink);
+      color: var(--paper);
+      accent-color: var(--lime);
+    }
+    button { font: inherit; }
+    button:focus-visible, [tabindex="0"]:focus-visible {
+      outline: 3px solid var(--lime);
+      outline-offset: 3px;
+    }
+    ::selection { background: var(--pink); color: var(--ink-deep); }
+    .page {
+      max-width: 1540px;
+      margin: 0 auto;
+      padding: 16px 22px 28px;
+    }
+    .masthead {
+      min-height: 72px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      border-bottom: 1px solid #534a72;
+      padding: 0 0 14px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 230px;
+    }
+    .brand-mark {
+      width: 42px;
+      height: 42px;
+      border-radius: 13px 13px 13px 4px;
+      display: grid;
+      place-items: center;
+      background: var(--pink);
+      color: var(--ink);
+      transform: rotate(-7deg);
+      box-shadow: 0 5px 10px #09071866;
+    }
+    .brand-mark svg { width: 26px; height: 26px; }
+    .brand-name {
+      margin: 0;
+      line-height: .86;
+      letter-spacing: -.055em;
+      font-size: 21px;
+      font-weight: 1000;
+      color: var(--paper);
+    }
+    .brand-name span {
+      display: block;
+      color: var(--orange);
+      font-size: 12px;
+      letter-spacing: .22em;
+      margin-top: 6px;
+    }
+    .cabinet-state {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .09em;
+      font-size: 11px;
+      font-weight: 800;
+    }
+    .lamp {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--orange);
+      box-shadow: 0 0 0 4px #ffb44d22;
+    }
+    .lamp.live { background: var(--lime); box-shadow: 0 0 0 4px #c8ef6722; }
+    .bank {
+      height: 42px;
+      padding: 7px 13px;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      background: #30284e;
+      border: 1px solid #695e8e;
+      border-radius: 7px;
+      color: var(--orange);
+      font-weight: 900;
+      font-variant-numeric: tabular-nums;
+    }
+    .bank svg { width: 19px; height: 19px; }
+    .bank small {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: .13em;
+      line-height: 1.2;
+    }
+    .top-button, .action-button, .small-button, .tool-button {
+      border: 0;
+      cursor: pointer;
+      font-weight: 900;
+      transition: transform .14s ease, filter .14s ease, background .14s ease;
+    }
+    .top-button:hover, .action-button:hover, .small-button:hover, .tool-button:hover { transform: translateY(-2px); filter: brightness(1.08); }
+    .top-button:active, .action-button:active, .small-button:active, .tool-button:active { transform: translateY(1px); }
+    .top-button {
+      min-height: 42px;
+      padding: 0 16px;
+      border-radius: 7px;
+      background: var(--aqua);
+      color: var(--ink-deep);
+      letter-spacing: .03em;
+    }
+    .stage-heading {
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: 16px;
+      padding: 16px 0 15px;
+    }
+    .stage-kicker {
+      margin: 0 0 4px;
+      color: var(--pink);
+      font-size: 11px;
+      letter-spacing: .19em;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+    h1 {
+      margin: 0;
+      color: var(--paper);
+      font-size: clamp(21px, 2.2vw, 30px);
+      line-height: 1;
+      letter-spacing: -.04em;
+    }
+    .stage-sub {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .stage-stamp {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .stage-stamp strong {
+      color: var(--ink-deep);
+      background: var(--orange);
+      padding: 8px 10px;
+      border-radius: 4px 9px 4px 4px;
+      font-size: 11px;
+    }
+    .game-layout {
+      display: grid;
+      grid-template-columns: minmax(500px, 1fr) 330px;
+      align-items: start;
+      gap: 18px;
+    }
+    .arena {
+      min-width: 0;
+      padding: 14px;
+      border: 1px solid #605783;
+      border-radius: 12px;
+      background: #292347;
+      box-shadow: 0 12px 24px #0b081c55;
+    }
+    .arena-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 0 auto 10px;
+      max-width: 700px;
+    }
+    .arena-label {
+      color: var(--aqua);
+      font-size: 11px;
+      text-transform: uppercase;
+      font-weight: 900;
+      letter-spacing: .14em;
+    }
+    .arena-hint { color: var(--muted); font-size: 11px; text-align: right; }
+    .board-frame {
+      width: var(--board-size);
+      max-width: 700px;
+      margin: 0 auto;
+      padding: 10px;
+      border: 5px solid #6a5b92;
+      border-radius: 9px;
+      background: #31294f;
+      box-shadow: 0 7px 13px #0a071855;
+    }
+    .column-heads {
+      display: grid;
+      grid-template-columns: repeat(10, 1fr);
+      gap: 2px;
+      padding-left: 20px;
+      margin-bottom: 3px;
+      color: #c5bbdf;
+      font-size: 11px;
+      text-align: center;
+      font-weight: 900;
+    }
+    .board-body {
+      display: grid;
+      grid-template-columns: 17px minmax(0, 1fr);
+      gap: 3px;
+    }
+    .row-heads {
+      display: grid;
+      grid-template-rows: repeat(10, 1fr);
+      color: #c5bbdf;
+      font-size: 11px;
+      align-items: center;
+      justify-items: center;
+      font-weight: 900;
+    }
+    .grid {
+      aspect-ratio: 1;
+      min-width: 0;
+      display: grid;
+      grid-template-columns: repeat(10, minmax(0, 1fr));
+      grid-template-rows: repeat(10, minmax(0, 1fr));
+      gap: 2px;
+      overflow: hidden;
+      border: 2px solid #241e3e;
+      border-radius: 4px;
+      background: #241e3e;
+    }
+    .tile {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 0;
+      min-height: 0;
+      padding: 0;
+      border: 1px solid #51476e;
+      border-radius: 2px;
+      background: #39305d;
+      color: white;
+      cursor: crosshair;
+      overflow: visible;
+      transition: background .12s ease, border-color .12s ease, transform .12s ease;
+    }
+    .tile:nth-child(3n + 1) { background: #342c56; }
+    .tile:hover { background: #5a4b83; z-index: 2; border-color: var(--cream); }
+    .tile.selected { outline: 2px solid var(--lime); outline-offset: -2px; z-index: 3; }
+    .tile.aiming { background: #623d63; cursor: crosshair; }
+    .tile.attack-flash { background: #9e3e55; border-color: #ffb4a4; }
+    .tile.objective-tile { background: #57456d; border-color: #a08abe; }
+    .tile.pickup-tile { background: #50466a; }
+    .tile.combined { box-shadow: inset 0 0 0 2px var(--aqua); }
+    .unit-token, .enemy-token, .objective-token, .drop-token {
+      position: absolute;
+      display: grid;
+      place-items: center;
+      font-weight: 1000;
+      z-index: 1;
+      user-select: none;
+    }
+    .unit-token {
+      width: 71%;
+      height: 71%;
+      border: 2px solid #fff4dc;
+      border-radius: 41% 45% 39% 44%;
+      box-shadow: 0 3px 5px #0e0a1b99;
+      color: var(--ink-deep);
+      font-size: clamp(11px, 1vw, 14px);
+      letter-spacing: -.06em;
+    }
+    .unit-token.cat { background: var(--pink); transform: rotate(-7deg); }
+    .unit-token.puffer { background: var(--aqua); border-radius: 50%; }
+    .unit-token.seal { background: var(--orange); border-radius: 47% 47% 42% 42%; }
+    .unit-token.duck { background: var(--lime); border-radius: 46% 50% 38% 45%; }
+    .unit-token.out { filter: grayscale(1); opacity: .35; }
+    .enemy-token {
+      width: 58%;
+      height: 58%;
+      border: 2px solid #ffd5c3;
+      border-radius: 4px;
+      color: #fff6df;
+      background: var(--danger);
+      font-size: 11px;
+      transform: rotate(45deg);
+      box-shadow: 0 3px 5px #0e0a1b88;
+    }
+    .enemy-token span { transform: rotate(-45deg); }
+    .enemy-token.hit { animation: enemy-hit .26s ease-out; }
+    .objective-token {
+      top: 2px;
+      left: 2px;
+      width: 13px;
+      height: 13px;
+      border-radius: 3px;
+      color: var(--ink-deep);
+      background: var(--orange);
+      font-size: 11px;
+      box-shadow: 0 1px 2px #150e2b88;
+    }
+    .objective-token.darts { background: var(--pink); }
+    .drop-token {
+      right: 3px;
+      top: 3px;
+      width: 13px;
+      height: 13px;
+      border: 1px solid #fff0bd;
+      border-radius: 50%;
+      color: var(--ink-deep);
+      background: var(--lime);
+      font-size: 11px;
+      box-shadow: 0 1px 4px #16102699;
+    }
+    .tile-note {
+      position: absolute;
+      left: 50%;
+      bottom: 2px;
+      transform: translateX(-50%);
+      color: #fff0bd;
+      font-size: 11px;
+      line-height: 1;
+      font-weight: 1000;
+      letter-spacing: .06em;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+    .tile.enemy-present::after {
+      content: attr(data-hp);
+      position: absolute;
+      right: -2px;
+      bottom: -2px;
+      z-index: 2;
+      min-width: 14px;
+      padding: 1px 2px;
+      border-radius: 3px;
+      background: var(--ink-deep);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 900;
+    }
+    .board-key {
+      max-width: 700px;
+      margin: 9px auto 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      color: #cec5e1;
+      font-size: 11px;
+    }
+    .key-item { display: inline-flex; align-items: center; gap: 5px; }
+    .key-dot { width: 8px; height: 8px; display: inline-block; border-radius: 2px; }
+    .key-dot.team { background: var(--aqua); }
+    .key-dot.foe { background: var(--danger); transform: rotate(45deg); }
+    .key-dot.goal { background: var(--orange); }
+    .key-dot.loot { background: var(--lime); border-radius: 50%; }
+    .side-rail {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-width: 0;
+    }
+    .paper-panel {
+      color: var(--paper-ink);
+      border-radius: 9px;
+      background: var(--cream);
+      box-shadow: 0 6px 12px #0b081c3b;
+    }
+    .objectives-panel { padding: 14px 15px 12px; }
+    .panel-heading {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      padding-bottom: 9px;
+      border-bottom: 1px dashed #9f92ac;
+    }
+    .panel-heading h2, .roster-heading h2, .supply-heading h2 {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1;
+      letter-spacing: -.02em;
+      text-transform: uppercase;
+    }
+    .panel-heading span, .roster-heading span, .supply-heading span {
+      color: #665b79;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+    .objective {
+      padding: 10px 0 9px;
+      border-bottom: 1px solid #d5c7aa;
+    }
+    .objective:last-child { border-bottom: 0; padding-bottom: 1px; }
+    .objective-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    .objective-name {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      font-weight: 1000;
+      letter-spacing: .02em;
+    }
+    .objective-glyph {
+      width: 24px;
+      height: 24px;
+      display: grid;
+      place-items: center;
+      border-radius: 6px;
+      color: var(--ink-deep);
+      background: var(--orange);
+      font-size: 11px;
+    }
+    .objective.darts .objective-glyph { background: var(--pink); }
+    .objective-percent {
+      color: #665b79;
+      font-size: 12px;
+      font-weight: 1000;
+      font-variant-numeric: tabular-nums;
+    }
+    .progress-track {
+      height: 7px;
+      margin: 6px 0 5px;
+      overflow: hidden;
+      border-radius: 6px;
+      background: #d1c4a8;
+    }
+    .progress-fill { width: 0; height: 100%; border-radius: inherit; background: #e88a37; transition: width .35s ease; }
+    .objective.darts .progress-fill { background: #da5688; }
+    .objective-foot {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      color: #716582;
+      font-size: 11px;
+    }
+    .roster-panel { padding: 12px 14px 8px; }
+    .roster-heading, .supply-heading {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 6px;
+    }
+    .unit-row {
+      display: grid;
+      grid-template-columns: minmax(0,1fr) auto;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 0;
+      border-bottom: 1px solid #d3c6a9;
+    }
+    .unit-row:last-child { border-bottom: 0; }
+    .unit-row.selected-unit { background: #eee0bc; margin: 0 -8px; padding: 8px; border-radius: 6px; }
+    .unit-row-main {
+      display: grid;
+      grid-template-columns: 34px minmax(0,1fr);
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+    .roster-token {
+      width: 30px;
+      height: 30px;
+      display: grid;
+      place-items: center;
+      border: 2px solid #fff7e1;
+      border-radius: 10px 10px 9px 5px;
+      color: var(--ink-deep);
+      font-size: 11px;
+      font-weight: 1000;
+      box-shadow: 0 2px 3px #31244b22;
+    }
+    .roster-token.cat { background: var(--pink); }
+    .roster-token.puffer { background: var(--aqua); border-radius: 50%; }
+    .roster-token.seal { background: var(--orange); border-radius: 50% 50% 40% 40%; }
+    .roster-token.duck { background: var(--lime); }
+    .unit-info { min-width: 0; }
+    .unit-name {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      color: #322849;
+      font-size: 12px;
+      font-weight: 1000;
+      line-height: 1.2;
+    }
+    .unit-name small { color: #796d87; font-size: 11px; font-weight: 800; }
+    .unit-status {
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      color: #73667f;
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+    .hp-dots { display: inline-flex; gap: 2px; }
+    .hp-dot { width: 5px; height: 5px; border-radius: 50%; background: #dd6580; }
+    .hp-dot.empty { background: #cbbfa7; }
+    .mini-progress {
+      width: 48px;
+      height: 4px;
+      background: #d2c5a9;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .mini-progress i { display: block; height: 100%; background: #785ed1; }
+    .unit-actions { display: flex; align-items: center; gap: 4px; }
+    .small-button {
+      min-height: 26px;
+      padding: 0 7px;
+      border-radius: 4px;
+      background: #ddd0b3;
+      color: #342a4d;
+      font-size: 11px;
+      letter-spacing: .02em;
+      white-space: nowrap;
+    }
+    .small-button.ready { background: #b2df55; }
+    .small-button:disabled { opacity: .45; cursor: not-allowed; transform: none; filter: none; }
+    .supplies-panel { padding: 12px 14px 13px; }
+    .tool-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+    .tool-button {
+      min-width: 0;
+      min-height: 54px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      border: 1px solid #74698a;
+      border-radius: 6px;
+      background: #e8dbbd;
+      color: var(--paper-ink);
+      font-size: 12px;
+      line-height: 1;
+    }
+    .tool-button strong { font-size: 11px; }
+    .tool-button small { color: #716681; font-size: 11px; font-weight: 900; }
+    .tool-button.armed { border: 2px solid #7555b7; background: #fff3d2; box-shadow: 0 2px 0 #7555b7; }
+    .tool-button.empty { opacity: .5; }
+    .utility-row { display: flex; gap: 7px; margin-top: 9px; }
+    .utility-row button {
+      flex: 1;
+      min-height: 31px;
+      border: 1px solid #655b7b;
+      border-radius: 5px;
+      background: #ded1b4;
+      color: #392d51;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 1000;
+    }
+    .utility-row button.armed { background: #d9ed9b; border-color: #708b2e; }
+    .shop-drawer {
+      display: none;
+      padding: 12px 14px;
+      border: 1px solid #625681;
+      border-radius: 9px;
+      background: #322a53;
+    }
+    .shop-drawer.open { display: block; }
+    .shop-drawer h2 { margin: 0 0 8px; color: var(--orange); font-size: 12px; text-transform: uppercase; letter-spacing: .1em; }
+    .chip-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 7px 0;
+      border-top: 1px solid #594f77;
+      color: var(--paper);
+      font-size: 12px;
+    }
+    .chip-row span small { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; }
+    .chip-row button {
+      padding: 6px 8px;
+      border: 0;
+      border-radius: 4px;
+      background: var(--aqua);
+      color: #15112c;
+      font-size: 11px;
+      font-weight: 1000;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .chip-row button:disabled { opacity: .45; cursor: not-allowed; }
+    .feed-panel {
+      padding: 10px 13px;
+      border-top: 1px solid #574d75;
+    }
+    .feed-panel h2 {
+      margin: 0 0 7px;
+      color: #d1c7e0;
+      font-size: 11px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: .15em;
+    }
+    .feed-list { display: flex; flex-direction: column; gap: 5px; }
+    .feed-item {
+      display: grid;
+      grid-template-columns: 29px minmax(0,1fr);
+      gap: 7px;
+      color: #c9c0d9;
+      font-size: 11px;
+      line-height: 1.35;
+    }
+    .feed-item time { color: var(--aqua); font-weight: 900; font-variant-numeric: tabular-nums; }
+    .bottom-controls {
+      max-width: 700px;
+      margin: 13px auto 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .action-button {
+      min-height: 43px;
+      padding: 0 18px;
+      border-radius: 6px;
+      color: var(--ink-deep);
+      background: var(--lime);
+      box-shadow: 0 4px 8px #09071855;
+      font-size: 11px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .action-button.live { background: var(--orange); }
+    .action-button svg { width: 14px; height: 14px; vertical-align: -3px; margin-right: 6px; }
+    .secondary-button {
+      min-height: 38px;
+      padding: 0 10px;
+      border: 1px solid #71668f;
+      border-radius: 5px;
+      color: var(--paper);
+      background: #39315a;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 900;
+    }
+    .secondary-button.active { color: var(--ink-deep); background: var(--pink); border-color: var(--pink); }
+    .control-note { margin-left: auto; color: #bdb4d1; font-size: 11px; text-align: right; }
+    .toast {
+      position: fixed;
+      z-index: 20;
+      left: 50%;
+      bottom: 22px;
+      transform: translate(-50%, 20px);
+      max-width: min(90vw, 430px);
+      padding: 11px 16px;
+      border: 1px solid #fff2cf;
+      border-radius: 7px;
+      background: var(--orange);
+      box-shadow: 0 7px 16px #08061677;
+      color: var(--ink-deep);
+      font-size: 12px;
+      font-weight: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .18s ease, transform .18s ease;
+    }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+    .end-banner {
+      display: none;
+      margin: 0 auto 10px;
+      max-width: 700px;
+      padding: 9px 12px;
+      border-radius: 5px;
+      background: var(--lime);
+      color: var(--ink-deep);
+      font-weight: 1000;
+      text-align: center;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+    .end-banner.show { display: block; }
+    .prototype-note {
+      margin: 14px 0 0;
+      color: #9f96b7;
+      font-size: 11px;
+      text-align: center;
+    }
+    @keyframes enemy-hit {
+      0% { transform: rotate(45deg) scale(1); }
+      45% { transform: rotate(45deg) scale(1.3); filter: brightness(1.8); }
+      100% { transform: rotate(45deg) scale(1); }
+    }
+    @media (max-width: 1080px) {
+      :root { --board-size: min(100%, 68vw); }
+      .game-layout { grid-template-columns: minmax(0, 1fr); }
+      .side-rail { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); align-items: start; }
+      .feed-panel { min-height: 110px; }
+    }
+    @media (max-width: 620px) {
+      :root { --board-size: 100%; }
+      .page { padding: 10px 10px 20px; }
+      .masthead { gap: 8px; min-height: 60px; padding-bottom: 10px; }
+      .brand { min-width: 0; gap: 8px; }
+      .brand-mark { width: 34px; height: 34px; border-radius: 10px 10px 10px 3px; }
+      .brand-mark svg { width: 21px; }
+      .brand-name { font-size: 16px; }
+      .brand-name span { font-size: 11px; margin-top: 5px; }
+      .cabinet-state { display: none; }
+      .bank { margin-left: auto; height: 36px; padding: 0 8px; gap: 5px; }
+      .bank svg { width: 15px; }
+      .bank strong { font-size: 12px; }
+      .top-button { min-height: 36px; padding: 0 10px; font-size: 11px; }
+      .stage-heading { align-items: center; padding: 13px 0 11px; }
+      .stage-stamp { gap: 6px; font-size: 11px; }
+      .stage-stamp strong { padding: 7px; font-size: 11px; }
+      .game-layout { gap: 11px; }
+      .arena { padding: 8px; border-radius: 9px; }
+      .arena-head { margin-bottom: 7px; }
+      .board-frame { padding: 6px; border-width: 3px; }
+      .column-heads { padding-left: 15px; font-size: 10px; }
+      .board-body { grid-template-columns: 13px minmax(0,1fr); }
+      .row-heads { font-size: 10px; }
+      .grid { gap: 1px; }
+      .unit-token { border-width: 1px; font-size: 11px; }
+      .enemy-token { border-width: 1px; }
+      .objective-token, .drop-token { width: 12px; height: 12px; font-size: 9px; top: 1px; left: 1px; }
+      .drop-token { left: auto; right: 1px; }
+      .tile-note { display: none; }
+      .board-key { gap: 8px; font-size: 10px; }
+      .bottom-controls { gap: 5px; flex-wrap: wrap; }
+      .action-button { flex: 1 1 100%; min-height: 40px; }
+      .secondary-button { flex: 1; min-height: 34px; padding: 0 6px; }
+      .control-note { width: 100%; margin: 2px 0 0; text-align: center; }
+      .side-rail { grid-template-columns: 1fr; gap: 9px; }
+      .objective-name { font-size: 11px; }
+      .prototype-note { line-height: 1.5; font-size: 11px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+    }
+  </style>
+</head>
+<body>
+  <svg aria-hidden="true" width="0" height="0" style="position:absolute">
+    <symbol id="icon-alien" viewBox="0 0 32 32">
+      <path d="M16 3c-6.5 0-11 4.7-11 11.2 0 6.1 4.4 11 11 11s11-4.9 11-11C27 7.7 22.5 3 16 3Z" fill="currentColor"/>
+      <path d="M9 4 5 1M23 4l4-3" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="12" cy="14" r="1.4" fill="#201b3c"/><circle cx="20" cy="14" r="1.4" fill="#201b3c"/>
+      <path d="M12 19c2.4 1.7 5.6 1.7 8 0" stroke="#201b3c" stroke-width="1.8" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="icon-coin" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="9.3" fill="none" stroke="currentColor" stroke-width="2"/>
+      <path d="M15.5 8.3c-.7-.7-1.7-1-3-1-1.8 0-3 .9-3 2.2 0 3.2 6 1.2 6 4.6 0 1.4-1.3 2.5-3.3 2.5-1.4 0-2.6-.4-3.6-1.3M12 5.5v13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="icon-needle" viewBox="0 0 24 24">
+      <path d="m5 19 9.8-9.8M11.5 5.8l6.7 6.7M13.5 3.8l6.7 6.7M4 20l4.3-1.4L5.4 16.7 4 20Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+    <symbol id="icon-laser" viewBox="0 0 24 24">
+      <path d="M4 16h10l3-3h3v-3h-3l-3-3H4v9Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+      <path d="M17 5h4M18 8h3M18 18h3M17 21h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="icon-spring" viewBox="0 0 24 24">
+      <path d="M3 18c4-7 14-7 18 0M5 18h14M8 18l-2 3m10-3 2 3M12 4v7m-3-4 3-3 3 3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+  </svg>
+  <main class="page">
+    <header class="masthead">
+      <div class="brand" aria-label="Alien All In">
+        <div class="brand-mark"><svg viewBox="0 0 32 32"><use href="#icon-alien"></use></svg></div>
+        <p class="brand-name">ALIEN<span>ALL IN</span></p>
+      </div>
+      <div class="cabinet-state"><span class="lamp" id="state-lamp"></span><span id="state-label">Planning phase</span></div>
+      <div class="bank" aria-label="Cash">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-coin"></use></svg>
+        <div><small>CASH</small><strong id="cash-value">120</strong></div>
+      </div>
+      <button class="top-button" id="shop-toggle" type="button" aria-expanded="false">SHOP</button>
+    </header>
+
+    <section class="stage-heading" aria-labelledby="stage-title">
+      <div>
+        <p class="stage-kicker">Sector 04 · Lucky Landing</p>
+        <h1 id="stage-title">The House Is Waddling</h1>
+        <p class="stage-sub">พาทีมทำภารกิจให้ครบ ก่อนฝูงมอนจะไล่ต้อนทุกตัว</p>
+      </div>
+      <div class="stage-stamp"><span>Round</span><strong>03 / 10</strong></div>
+    </section>
+
+    <div class="game-layout">
+      <section class="arena" aria-label="สนามป้องกัน">
+        <div class="arena-head">
+          <span class="arena-label">สนาม 10 × 10</span>
+          <span class="arena-hint" id="board-hint">เลือกเอเลี่ยน แล้วแตะช่องว่างเพื่อย้าย</span>
+        </div>
+        <div class="end-banner" id="end-banner" role="status"></div>
+        <div class="board-frame">
+          <div class="column-heads" id="column-heads" aria-hidden="true"></div>
+          <div class="board-body">
+            <div class="row-heads" id="row-heads" aria-hidden="true"></div>
+            <div class="grid" id="grid" role="grid" aria-label="กระดาน 10 คูณ 10"></div>
+          </div>
+        </div>
+        <div class="board-key" aria-label="คำอธิบายสัญลักษณ์">
+          <span class="key-item"><i class="key-dot team"></i>ทีมเรา</span>
+          <span class="key-item"><i class="key-dot foe"></i>ศัตรู · HP 10</span>
+          <span class="key-item"><i class="key-dot goal"></i>Objective</span>
+          <span class="key-item"><i class="key-dot loot"></i>ของให้เป็ดเก็บ</span>
+        </div>
+        <div class="bottom-controls">
+          <button class="action-button" id="run-toggle" type="button">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 3 11 7-11 7V3Z" fill="currentColor"/></svg>
+            <span>เริ่มปฏิบัติการ</span>
+          </button>
+          <button class="secondary-button" id="grab-duck" type="button">จับเป็ด</button>
+          <button class="secondary-button" id="speed-toggle" type="button">ความเร็ว 1×</button>
+          <button class="secondary-button" id="reset-game" type="button">เริ่มด่านใหม่</button>
+          <span class="control-note" id="control-note">ตอนเตรียมทีม · วางแผนก่อนกดเริ่ม</span>
+        </div>
+      </section>
+
+      <aside class="side-rail" aria-label="ภารกิจและคำสั่ง">
+        <section class="paper-panel objectives-panel">
+          <div class="panel-heading">
+            <h2>ภารกิจประจำด่าน</h2>
+            <span>ทำให้ครบ 2 รายการ</span>
+          </div>
+          <div id="objectives"></div>
+        </section>
+
+        <section class="paper-panel roster-panel">
+          <div class="roster-heading">
+            <h2>ลูกทีมในสนาม</h2>
+            <span>คลิกเพื่อเลือก</span>
+          </div>
+          <div id="roster"></div>
+        </section>
+
+        <section class="paper-panel supplies-panel">
+          <div class="supply-heading">
+            <h2>ของที่เป็ดเก็บได้</h2>
+            <span>กดใช้ แล้วเลือกตัว</span>
+          </div>
+          <div class="tool-list" id="tools"></div>
+          <div class="utility-row">
+            <button id="grab-duck-side" type="button">จับเป็ดไปวาง</button>
+            <button id="cancel-target" type="button">ยกเลิกคำสั่ง</button>
+          </div>
+        </section>
+
+        <section class="shop-drawer" id="shop-drawer" aria-label="ร้านขาย Chip">
+          <h2>ชิปเสริมกำลัง</h2>
+          <div class="chip-row"><span>CAT CHIP<small>แมว · เพิ่มพลังโจมตี</small></span><button data-chip="cat">ซื้อ 40</button></div>
+          <div class="chip-row"><span>PUFFER CHIP<small>ปลาปักเป้า · เพิ่มพลังโจมตี</small></span><button data-chip="puffer">ซื้อ 40</button></div>
+          <div class="chip-row"><span>SEAL CHIP<small>แมวน้ำ · เพิ่มพลังโจมตี</small></span><button data-chip="seal">ซื้อ 40</button></div>
+        </section>
+
+        <section class="feed-panel" aria-live="polite">
+          <h2>เสียงจากสนาม</h2>
+          <div class="feed-list" id="feed"></div>
+        </section>
+      </aside>
+    </div>
+    <p class="prototype-note">ต้นแบบทดลอง · HP ของเอเลี่ยน ความเร็วโจมตี และอัตรา Objective เป็นค่าจำลองเพื่อให้เห็นจังหวะการเล่น</p>
+  </main>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    const columns = "ABCDEFGHIJ".split("");
+    const initialUnits = [
+      { id: "cat", name: "MISO-9", kind: "cat", code: "C", x: 3, y: 7, hp: 3, damage: 2, switch: 0, role: "คลื่นปั่นสมอง", cooldown: 0, laser: 0 },
+      { id: "puffer", name: "PUFF DADDY", kind: "puffer", code: "P", x: 8, y: 1, hp: 3, damage: 2, switch: 0, role: "พุ่งแนวตรง", cooldown: 0, laser: 0 },
+      { id: "seal", name: "BOUNCE-8", kind: "seal", code: "S", x: 6, y: 7, hp: 3, damage: 3, switch: 0, role: "กระโดดกระแทก", cooldown: 0, laser: 0 },
+      { id: "duck", name: "QUACK.exe", kind: "duck", code: "D", x: 1, y: 1, hp: 1, damage: 0, switch: 0, role: "เก็บของ · ทำกิจกรรม", cooldown: 0, laser: 0 }
+    ];
+    const initialObjectives = [
+      { id: "casino", title: "ตู้คาสิโน", subtitle: "เป็ด · +1 Cash / รอบ", code: "$", x: 1, y: 1, progress: 0 },
+      { id: "darts", title: "ปาลูกดอก", subtitle: "ปลาปักเป้า · +1 / รอบ", code: "D", x: 8, y: 0, progress: 0 }
+    ];
+    const initialDrops = [
+      { id: "needle", name: "เข็ม", code: "N", x: 4, y: 5 },
+      { id: "laser", name: "เลเซอร์", code: "L", x: 8, y: 5 },
+      { id: "spring", name: "แทมโปลีน", code: "T", x: 5, y: 8 }
+    ];
+    const toolInfo = {
+      needle: { title: "เข็ม", short: "NEEDLE", user: "puffer", label: "ปล่อยหนาม 8 ทิศ" },
+      laser: { title: "เลเซอร์", short: "LASER", user: "cat", label: "เพิ่มกระสุน 3 นัด" },
+      spring: { title: "แทมโปลีน", short: "BOUNCE", user: "seal", label: "เพิ่มวงกระโดด" }
+    };
+    let state;
+    let timer = null;
+    let toastTimer = null;
+    const grid = document.getElementById("grid");
+    const $ = (id) => document.getElementById(id);
+
+    function newState() {
+      return {
+        mode: "prep", elapsed: 0, loop: 0, cash: 120, speed: 1,
+        selected: null, grabDuck: false, pendingTool: null, pendingSwitch: null,
+        units: structuredClone(initialUnits),
+        objectives: structuredClone(initialObjectives),
+        drops: structuredClone(initialDrops),
+        inventory: { needle: 0, laser: 0, spring: 0 },
+        enemies: [
+          { id: 1, x: 4, y: 4, hp: 10, lastAttack: 0 },
+          { id: 2, x: 6, y: 5, hp: 10, lastAttack: 0 }
+        ],
+        nextEnemyId: 3, feed: [], attackTiles: {}, chips: { cat: 0, puffer: 0, seal: 0 }
+      };
+    }
+    state = newState();
+
+    function makeBoard() {
+      $("column-heads").innerHTML = columns.map((letter) => "<span>" + letter + "</span>").join("");
+      $("row-heads").innerHTML = Array.from({ length: 10 }, (_, i) => "<span>" + (i + 1) + "</span>").join("");
+      grid.innerHTML = "";
+      for (let y = 0; y < 10; y++) {
+        for (let x = 0; x < 10; x++) {
+          const cell = document.createElement("button");
+          cell.type = "button";
+          cell.className = "tile";
+          cell.dataset.x = x;
+          cell.dataset.y = y;
+          cell.setAttribute("role", "gridcell");
+          cell.setAttribute("aria-label", columns[x] + (y + 1) + " empty");
+          cell.addEventListener("click", () => onCellClick(x, y));
+          grid.appendChild(cell);
+        }
+      }
+    }
+    function dist(a, b) { return Math.abs(a.x - b.x) + Math.abs(a.y - b.y); }
+    function unitAt(x, y, aliveOnly = true) { return state.units.find(u => u.x === x && u.y === y && (!aliveOnly || u.hp > 0)); }
+    function enemiesAt(x, y) { return state.enemies.filter(e => e.hp > 0 && e.x === x && e.y === y); }
+    function objAt(x, y) { return state.objectives.find(o => o.x === x && o.y === y); }
+    function dropAt(x, y) { return state.drops.find(d => d.x === x && d.y === y); }
+    function getUnit(id) { return state.units.find(u => u.id === id); }
+    function addFeed(message) {
+      const stamp = String(Math.floor(state.elapsed / 60)).padStart(2, "0") + ":" + String(state.elapsed % 60).padStart(2, "0");
+      state.feed.unshift({ stamp, message });
+      state.feed = state.feed.slice(0, 4);
+      renderFeed();
+    }
+    function notify(message) {
+      const toast = $("toast");
+      toast.textContent = message;
+      toast.classList.add("show");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove("show"), 1900);
+    }
+    function drawBoard() {
+      const cells = [...grid.children];
+      for (const cell of cells) {
+        const x = Number(cell.dataset.x), y = Number(cell.dataset.y);
+        const obj = objAt(x, y);
+        const drop = dropAt(x, y);
+        const units = state.units.filter(u => u.x === x && u.y === y && u.hp > 0);
+        const unit = units[0];
+        const enemies = enemiesAt(x, y);
+        cell.className = "tile";
+        cell.innerHTML = "";
+        if (obj) {
+          cell.classList.add("objective-tile");
+          const marker = document.createElement("span");
+          marker.className = "objective-token " + obj.id;
+          marker.textContent = obj.code;
+          marker.title = obj.title;
+          cell.appendChild(marker);
+        }
+        if (drop) {
+          cell.classList.add("pickup-tile");
+          const marker = document.createElement("span");
+          marker.className = "drop-token";
+          marker.textContent = drop.code;
+          marker.title = "ของตก: " + drop.name;
+          cell.appendChild(marker);
+        }
+        if (state.selected && unit && unit.id === state.selected) cell.classList.add("selected");
+        if (state.pendingSwitch) cell.classList.add("aiming");
+        if (state.attackTiles[x + "," + y] > Date.now()) cell.classList.add("attack-flash");
+        if (unit && drop) cell.classList.add("combined");
+        if (units.length) {
+          for (const piece of units) {
+            const marker = document.createElement("span");
+            marker.className = "unit-token " + piece.kind + (piece.id === state.selected ? " chosen" : "");
+            marker.textContent = piece.code;
+            marker.title = piece.name + " — " + piece.role;
+            if (units.length > 1) marker.style.transform = "translate(" + ((units.indexOf(piece) - (units.length - 1) / 2) * 35) + "%, 24%) scale(.78)";
+            cell.appendChild(marker);
+          }
+          if (units.some(piece => piece.id === "duck" && piece.x === objAtSafe("casino").x && piece.y === objAtSafe("casino").y)) {
+            const note = document.createElement("span");
+            note.className = "tile-note";
+            note.textContent = "WORK";
+            cell.appendChild(note);
+          }
+        }
+        if (enemies.length) {
+          const marker = document.createElement("span");
+          marker.className = "enemy-token" + (enemies.some(e => e.hitUntil > Date.now()) ? " hit" : "");
+          marker.innerHTML = "<span>×</span>";
+          marker.title = "Enemy · HP " + enemies[0].hp;
+          cell.appendChild(marker);
+          cell.classList.add("enemy-present");
+          cell.dataset.hp = enemies[0].hp;
+        } else {
+          delete cell.dataset.hp;
+        }
+        const contents = [];
+        if (units.length) contents.push(units.map(piece => piece.name).join(" + "));
+        if (obj) contents.push(obj.title);
+        if (drop) contents.push("Item " + drop.name);
+        if (enemies.length) contents.push("Enemy HP " + enemies[0].hp);
+        cell.setAttribute("aria-label", columns[x] + (y + 1) + (contents.length ? ": " + contents.join(", ") : ": ช่องว่าง"));
+      }
+    }
+    function objAtSafe(id) { return state.objectives.find(o => o.id === id) || { x: -1, y: -1 }; }
+    function renderObjectives() {
+      $("objectives").innerHTML = state.objectives.map(obj => {
+        const actor = getUnit(obj.id === "casino" ? "duck" : obj.id === "darts" ? "puffer" : "");
+        const ready = actor && actor.hp > 0 && dist(actor, obj) <= 1;
+        const pct = Math.min(100, Math.floor(obj.progress));
+        return '<div class="objective ' + obj.id + '">' +
+          '<div class="objective-top"><div class="objective-name"><span class="objective-glyph">' + obj.code + '</span>' + obj.title + '</div><span class="objective-percent">' + pct + '%</span></div>' +
+          '<div class="progress-track" role="progressbar" aria-valuenow="' + pct + '" aria-valuemin="0" aria-valuemax="100" aria-label="' + obj.title + '"><div class="progress-fill" style="width:' + pct + '%"></div></div>' +
+          '<div class="objective-foot"><span>' + obj.subtitle + '</span><span>' + (pct >= 100 ? "เสร็จแล้ว" : ready ? "กำลังทำงาน" : "ต้องเข้าใกล้จุด") + '</span></div></div>';
+      }).join("");
+    }
+    function renderRoster() {
+      const order = ["cat", "puffer", "seal", "duck"];
+      $("roster").innerHTML = order.map(id => {
+        const unit = getUnit(id);
+        const selected = state.selected === id ? " selected-unit" : "";
+        const dots = id === "duck" ? "" : '<span class="hp-dots">' + [0,1,2].map(i => '<i class="hp-dot' + (i >= unit.hp ? ' empty' : '') + '"></i>').join("") + '</span>';
+        const switchBar = id === "duck" ? "" : '<span class="mini-progress" title="Switch ' + unit.switch + '%"><i style="width:' + unit.switch + '%"></i></span>';
+        const isReady = id !== "duck" && unit.switch >= 100;
+        const action = id === "duck" ? "" : (isReady
+            ? '<button class="small-button ready" data-switch="' + id + '" type="button">SWITCH</button>'
+            : '<button class="small-button" data-upgrade="' + id + '" type="button" title="ใช้ 40 Cash เพิ่มพลังโจมตี">+ATK 40</button>');
+        return '<div class="unit-row' + selected + '">' +
+          '<button class="unit-row-main" data-select="' + id + '" type="button" aria-pressed="' + (state.selected === id) + '" aria-label="เลือก ' + unit.name + '">' +
+          '<span class="roster-token ' + unit.kind + '">' + unit.code + '</span>' +
+          '<span class="unit-info"><span class="unit-name">' + unit.name + ' <small>' + unit.role + '</small></span>' +
+          '<span class="unit-status">' + dots + switchBar + (unit.hp <= 0 ? '<span>OUT</span>' : '') + '</span></span></button>' +
+          '<div class="unit-actions">' + action + '</div></div>';
+      }).join("");
+      document.querySelectorAll("[data-select]").forEach(btn => btn.addEventListener("click", () => selectUnit(btn.dataset.select)));
+      document.querySelectorAll("[data-upgrade]").forEach(btn => btn.addEventListener("click", () => upgradeUnit(btn.dataset.upgrade)));
+      document.querySelectorAll("[data-switch]").forEach(btn => btn.addEventListener("click", () => setSwitchTarget(btn.dataset.switch)));
+    }
+    function renderTools() {
+      const order = ["needle", "laser", "spring"];
+      $("tools").innerHTML = order.map(id => {
+        const info = toolInfo[id];
+        const count = state.inventory[id];
+        const armed = state.pendingTool === id;
+        return '<button type="button" class="tool-button' + (count === 0 ? ' empty' : '') + (armed ? ' armed' : '') + '" data-tool="' + id + '" aria-pressed="' + armed + '" title="' + info.label + '">' +
+          '<strong>' + info.short + '</strong><small>' + info.title + ' × ' + count + '</small></button>';
+      }).join("");
+      document.querySelectorAll("[data-tool]").forEach(btn => btn.addEventListener("click", () => armTool(btn.dataset.tool)));
+    }
+    function renderFeed() {
+      $("feed").innerHTML = state.feed.length ? state.feed.map(item => '<div class="feed-item"><time>' + item.stamp + '</time><span>' + item.message + '</span></div>').join("") :
+        '<div class="feed-item"><time>--:--</time><span>ยังไม่มีเหตุการณ์ · กดเริ่มเพื่อเปิดฉาก</span></div>';
+    }
+    function render() {
+      drawBoard();
+      renderObjectives();
+      renderRoster();
+      renderTools();
+      renderFeed();
+      $("cash-value").textContent = state.cash;
+      const live = state.mode === "run";
+      $("state-label").textContent = live ? "Defense active" : state.mode === "over" ? "Run complete" : "Planning phase";
+      $("state-lamp").classList.toggle("live", live);
+      $("run-toggle").classList.toggle("live", live);
+      $("run-toggle").innerHTML = live
+        ? '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 4h4v12H5zM11 4h4v12h-4z" fill="currentColor"/></svg><span>หยุดชั่วคราว</span>'
+        : state.mode === "paused"
+          ? '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 3 11 7-11 7V3Z" fill="currentColor"/></svg><span>เล่นต่อ</span>'
+          : '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 3 11 7-11 7V3Z" fill="currentColor"/></svg><span>เริ่มปฏิบัติการ</span>';
+      $("grab-duck").classList.toggle("active", state.grabDuck);
+      $("grab-duck-side").classList.toggle("armed", state.grabDuck);
+      $("grab-duck").textContent = state.grabDuck ? "แตะช่องเพื่อวางเป็ด" : "จับเป็ด";
+      $("grab-duck-side").textContent = state.grabDuck ? "แตะช่องเพื่อวางเป็ด" : "จับเป็ดไปวาง";
+      $("speed-toggle").textContent = "ความเร็ว " + state.speed + "×";
+      $("board-hint").textContent = state.pendingSwitch ? "เลือกช่องให้ Switch · ทับช่องเพื่อนเพื่อคอมโบ" :
+        state.pendingTool ? "เลือกตัวที่ใช้ " + toolInfo[state.pendingTool].title :
+        state.grabDuck ? "แตะช่องที่ต้องการวางเป็ด" :
+        state.mode === "prep" ? "เลือกเอเลี่ยน แล้วแตะช่องว่างเพื่อย้าย" :
+        state.mode === "run" ? "ทีมกำลังทำงาน · ใช้ของหรือวาง Switch ได้" : "เกมหยุดอยู่ · จัดตำแหน่งได้";
+      $("control-note").textContent = state.mode === "run" ? "ทีมทำงานอัตโนมัติ · คอยช่วยเมื่อจำเป็น" :
+        state.mode === "paused" ? "หยุดชั่วคราว · ปรับตำแหน่งหรือใช้ของได้" : "ตอนเตรียมทีม · วางแผนก่อนกดเริ่ม";
+      document.querySelectorAll("[data-chip]").forEach(btn => btn.disabled = state.cash < 40 || state.chips[btn.dataset.chip] >= 10);
+      const banner = $("end-banner");
+      banner.classList.toggle("show", state.mode === "over");
+      if (state.mode === "over") banner.textContent = state.result === "win" ? "CASH OUT! ภารกิจสำเร็จ — บ้านแตก แต่พอร์ตเขียว" : "หมดหน้าตัก! ทีมเอเลี่ยนถูกโค่น — เริ่มด่านใหม่ได้เลย";
+    }
+    function selectUnit(id) {
+      if (state.pendingTool) return applyTool(id);
+      if (state.mode === "run" && id === "duck") {
+        notify("จับเป็ดได้ตอนมันทำงานหรือปลอดภัย กด “จับเป็ด” แล้วเลือกช่อง");
+        return;
+      }
+      state.selected = id;
+      render();
+    }
+    function onCellClick(x, y) {
+      if (state.pendingSwitch) { resolveSwitch(x, y); return; }
+      if (state.grabDuck) { placeDuck(x, y); return; }
+      const targetUnit = unitAt(x, y);
+      if (state.pendingTool) {
+        if (targetUnit) applyTool(targetUnit.id);
+        else notify("เลือกตัวละครในช่องหรือรายชื่อลูกทีมก่อน");
+        return;
+      }
+      if ((state.mode === "prep" || state.mode === "paused") && state.selected) {
+        if (targetUnit && targetUnit.id !== state.selected) {
+          state.selected = targetUnit.id;
+          notify("เลือก " + targetUnit.name + " แล้ว");
+          render();
+          return;
+        }
+        const mover = getUnit(state.selected);
+        if (!mover || mover.hp <= 0) return;
+        const occupied = unitAt(x, y);
+        if (occupied && occupied.id !== mover.id && mover.id !== "duck") {
+          notify("ช่องนี้มีเพื่อนอยู่แล้ว");
+          return;
+        }
+        mover.x = x; mover.y = y;
+        state.selected = null;
+        collectAtDuck();
+        addFeed(mover.name + " ย้ายไปช่อง " + columns[x] + (y + 1));
+        render();
+        return;
+      }
+      if (targetUnit) selectUnit(targetUnit.id);
+    }
+    function placeDuck(x, y) {
+      const duck = getUnit("duck");
+      if (state.mode === "run" && state.enemies.some(e => e.hp > 0 && dist(e, duck) <= 1)) {
+        state.grabDuck = false;
+        notify("เป็ดตกใจอยู่! มีศัตรูใกล้เกินไป");
+        render();
+        return;
+      }
+      duck.x = x; duck.y = y;
+      state.grabDuck = false;
+      state.selected = "duck";
+      collectAtDuck();
+      addFeed("ยก QUACK.exe ไปวางที่ " + columns[x] + (y + 1));
+      render();
+    }
+    function collectAtDuck() {
+      const duck = getUnit("duck");
+      const drop = dropAt(duck.x, duck.y);
+      if (!drop) return;
+      state.inventory[drop.id] += 1;
+      state.drops = state.drops.filter(d => d.id !== drop.id);
+      addFeed("เป็ดเก็บ " + drop.name + " ได้แล้ว · เข้าคลัง +1");
+      notify("เก็บ " + drop.name + " ได้ +1");
+    }
+    function armTool(id) {
+      if (!state.inventory[id]) { notify("ยังไม่มี " + toolInfo[id].title + " · ให้เป็ดเดินไปเก็บของบนกระดาน"); return; }
+      state.pendingTool = state.pendingTool === id ? null : id;
+      state.pendingSwitch = null;
+      render();
+    }
+    function applyTool(unitId) {
+      const id = state.pendingTool;
+      const info = toolInfo[id];
+      const unit = getUnit(unitId);
+      if (!unit || unit.hp <= 0) { notify("ตัวนี้ใช้ของไม่ได้"); return; }
+      if (unit.id !== info.user) { notify("ของชิ้นนี้ใช้กับ " + getUnit(info.user).name + ""); return; }
+      state.inventory[id] -= 1;
+      state.pendingTool = null;
+      if (id === "needle") {
+        const p = unit;
+        let hit = 0;
+        for (const enemy of [...state.enemies]) {
+          const dx = enemy.x - p.x, dy = enemy.y - p.y;
+          if ((dx === 0 || dy === 0 || Math.abs(dx) === Math.abs(dy)) && Math.max(Math.abs(dx), Math.abs(dy)) <= 4) {
+            damageEnemy(enemy, 4, "หนาม 8 ทิศ", p.id);
+            hit++;
+          }
+        }
+        if (!hit) addFeed("ปลาปักเป้าปล่อยหนาม 8 ทิศ แต่ยังไม่โดนใคร");
+        notify("ปลาปักเป้าพ่นหนาม 8 ทิศ!");
+      } else if (id === "laser") {
+        unit.laser += 3;
+        addFeed("ติดปืนเลเซอร์ให้ MISO-9 · มีกระสุน 3 นัด");
+        notify("แมวได้กระสุนเลเซอร์ 3 นัด");
+      } else {
+        unit.radius = 2;
+        unit.cooldownBonus = 1;
+        addFeed("กางแทมโปลีนให้ BOUNCE-8 · วงกระโดดกว้างขึ้น");
+        notify("วงกระโดดกว้างขึ้น แต่ร่ายช้าลง");
+      }
+      render();
+    }
+    function setSwitchTarget(id) {
+      const unit = getUnit(id);
+      if (!unit || unit.switch < 100) return;
+      state.pendingSwitch = id;
+      state.pendingTool = null;
+      render();
+    }
+    function resolveSwitch(x, y) {
+      const source = getUnit(state.pendingSwitch);
+      const partner = unitAt(x, y);
+      const actors = [source];
+      if (partner && partner.id !== source.id && partner.id !== "duck" && partner.hp > 0) actors.push(partner);
+      if (source) source.switch = 0;
+      if (actors.length > 1) partner.switch = 0;
+      state.pendingSwitch = null;
+      const label = actors.map(u => u.name).join(" + ");
+      let hits = 0;
+      for (const enemy of [...state.enemies]) {
+        const d = Math.max(Math.abs(enemy.x - x), Math.abs(enemy.y - y));
+        if (d <= (actors.some(u => u.id === "seal" && u.radius === 2) ? 2 : 1)) {
+          damageEnemy(enemy, actors.length > 1 ? 6 : 5, "Switch");
+          hits++;
+        }
+      }
+      state.attackTiles[x + "," + y] = Date.now() + 420;
+      addFeed("Switch: " + label + " ปล่อยท่าพิเศษ" + (hits ? " · โดนศัตรู " + hits + " ตัว" : " · ศัตรูยังไม่เข้าเป้า"));
+      notify(actors.length > 1 ? "คอมโบ Switch! " + label : "Switch! " + label);
+      render();
+    }
+    function upgradeUnit(id) {
+      const unit = getUnit(id);
+      if (state.cash < 40) { notify("Cash ไม่พอ ออกไปปั่น Objective ก่อน"); return; }
+      state.cash -= 40;
+      unit.damage += 1;
+      state.chips[id] = Math.min(10, state.chips[id] + 1);
+      addFeed("โยน 40 Cash ให้ " + unit.name + " · พลังโจมตี +1");
+      render();
+    }
+    function buyChip(id) {
+      if (state.cash < 40 || state.chips[id] >= 10) return;
+      state.cash -= 40;
+      state.chips[id] += 1;
+      const unit = getUnit(id);
+      unit.damage += 1;
+      addFeed("ซื้อ Chip ให้ " + unit.name + " · พลังโจมตี +1");
+      notify("Chip ติดตั้งแล้ว · " + unit.name + " แรงขึ้น");
+      render();
+    }
+    function damageEnemy(enemy, amount, source, attackerId = null) {
+      if (enemy.hp <= 0) return;
+      enemy.hp -= amount;
+      enemy.hitUntil = Date.now() + 260;
+      state.attackTiles[enemy.x + "," + enemy.y] = Date.now() + 360;
+      const attacker = attackerId ? getUnit(attackerId) : null;
+      if (attacker) attacker.switch = Math.min(100, attacker.switch + 18);
+      if (enemy.hp <= 0) {
+        state.enemies = state.enemies.filter(e => e.id !== enemy.id);
+        addFeed("Enemy ล้มแล้ว · " + source);
+      }
+    }
+    function nearestCombatant(enemy) {
+      return state.units.filter(u => u.hp > 0 && u.id !== "duck").sort((a,b) => dist(a, enemy) - dist(b, enemy))[0];
+    }
+    function attackPhase() {
+      const now = Date.now();
+      for (const unit of state.units.filter(u => u.hp > 0 && u.id !== "duck")) {
+        if (now < unit.cooldown) continue;
+        let candidates = state.enemies.filter(enemy => {
+          if (unit.id === "puffer") return enemy.x === unit.x || enemy.y === unit.y;
+          if (unit.id === "cat") return dist(unit, enemy) <= 4;
+          return dist(unit, enemy) <= (unit.radius || 1);
+        }).sort((a,b) => dist(unit,a)-dist(unit,b));
+        const enemy = candidates[0];
+        if (!enemy) continue;
+        const power = unit.damage + (unit.id === "cat" && unit.laser > 0 ? 2 : 0);
+        damageEnemy(enemy, power, unit.id === "seal" ? "กระโดดกระแทก" : unit.id === "puffer" ? "พุ่งแนวตรง" : "คลื่นแมว", unit.id);
+        if (unit.id === "cat" && unit.laser > 0) unit.laser -= 1;
+        if (unit.id === "seal") {
+          const dx = Math.sign(enemy.x - unit.x), dy = Math.sign(enemy.y - unit.y);
+          if (enemy.hp > 0) { enemy.x = Math.max(0, Math.min(9, enemy.x + dx)); enemy.y = Math.max(0, Math.min(9, enemy.y + dy)); }
+        }
+        const delay = unit.id === "seal" && unit.cooldownBonus ? 2500 : unit.id === "seal" ? 1450 : 1050;
+        unit.cooldown = now + delay;
+        state.attackTiles[enemy.x + "," + enemy.y] = now + 380;
+        addFeed(unit.name + " โจมตี Enemy · -" + power + " HP" + (unit.switch >= 100 ? " · Switch พร้อมแล้ว" : ""));
+      }
+    }
+    function enemyPhase() {
+      for (const enemy of state.enemies) {
+        const target = nearestCombatant(enemy);
+        if (!target) return;
+        if (dist(enemy, target) <= 1) {
+          if (state.loop % 2 === 0) {
+            target.hp = Math.max(0, target.hp - 1);
+            addFeed("Enemy โจมตี " + target.name + " · HP -" + 1);
+          }
+        } else if (state.loop % 2 === 0) {
+          const dx = Math.sign(target.x - enemy.x), dy = Math.sign(target.y - enemy.y);
+          if (Math.abs(target.x - enemy.x) >= Math.abs(target.y - enemy.y)) enemy.x += dx;
+          else enemy.y += dy;
+          enemy.x = Math.max(0, Math.min(9, enemy.x));
+          enemy.y = Math.max(0, Math.min(9, enemy.y));
+        }
+      }
+      if (state.loop % 5 === 0 && state.enemies.length < 6) {
+        const x = Math.floor(Math.random() * 10);
+        state.enemies.push({ id: state.nextEnemyId++, x, y: 9, hp: 10, lastAttack: 0 });
+        addFeed("มีศัตรูชุดใหม่โผล่ที่ขอบสนาม");
+      }
+    }
+    function objectivePhase() {
+      for (const objective of state.objectives) {
+        const actorId = objective.id === "casino" ? "duck" : objective.id === "darts" ? "puffer" : "";
+        const actor = getUnit(actorId);
+        if (actor && actor.hp > 0 && dist(actor, objective) <= 1 && objective.progress < 100) {
+          objective.progress = Math.min(100, objective.progress + 7);
+          if (objective.id === "casino") {
+            state.cash += 1;
+            if (state.loop % 2 === 0) addFeed("QUACK.exe ปั่นสล็อต · Cash +1");
+          } else if (state.loop % 2 === 0) {
+            addFeed("ปลาปักเป้าปาลูกดอก · Objective +7%");
+          }
+          if (objective.progress >= 100) {
+            addFeed("Objective เสร็จแล้ว: " + objective.title);
+            notify("Objective สำเร็จ: " + objective.title);
+          }
+        }
+      }
+    }
+    function checkEnd() {
+      if (state.objectives.every(o => o.progress >= 100)) {
+        endGame("win");
+        return;
+      }
+      if (state.units.filter(u => u.id !== "duck").every(u => u.hp <= 0)) endGame("lose");
+    }
+    function endGame(result) {
+      state.mode = "over";
+      state.result = result;
+      clearInterval(timer);
+      timer = null;
+      addFeed(result === "win" ? "ทีมถอนเงินกลับบ้านได้ครบ!" : "ทีมเอเลี่ยนล้มหมดแล้ว");
+      render();
+    }
+    function tick() {
+      if (state.mode !== "run") return;
+      state.elapsed += state.speed;
+      state.loop += 1;
+      objectivePhase();
+      attackPhase();
+      enemyPhase();
+      checkEnd();
+      render();
+    }
+    function startRun() {
+      if (state.mode === "run") {
+        state.mode = "paused";
+        clearInterval(timer); timer = null;
+        addFeed("หยุดเกมชั่วคราว");
+      } else if (state.mode === "over") {
+        return;
+      } else {
+        state.mode = "run";
+        if (!state.feed.length) addFeed("เริ่มปฏิบัติการ · ศัตรูเข้ามาขัดขวางแล้ว");
+        timer = setInterval(tick, state.speed === 2 ? 600 : 1100);
+      }
+      render();
+    }
+    function toggleDuck() {
+      if (state.grabDuck) {
+        state.grabDuck = false;
+        render();
+        return;
+      }
+      const duck = getUnit("duck");
+      if (state.mode === "run" && state.enemies.some(e => e.hp > 0 && dist(e, duck) <= 1)) {
+        notify("เป็ดกำลังตกใจ หนีอยู่ จับไม่ได้");
+        return;
+      }
+      state.grabDuck = true;
+      state.pendingTool = null;
+      state.pendingSwitch = null;
+      render();
+    }
+    function resetGame() {
+      clearInterval(timer); timer = null;
+      state = newState();
+      $("shop-drawer").classList.remove("open");
+      $("shop-toggle").setAttribute("aria-expanded", "false");
+      addFeed("จัดทีมใหม่แล้ว · วางตำแหน่งก่อนเริ่ม");
+      render();
+    }
+    makeBoard();
+    addFeed("ทีมพร้อมแล้ว · เป็ดกำลังรอรับงาน");
+    render();
+    $("run-toggle").addEventListener("click", startRun);
+    $("grab-duck").addEventListener("click", toggleDuck);
+    $("grab-duck-side").addEventListener("click", toggleDuck);
+    $("speed-toggle").addEventListener("click", () => {
+      state.speed = state.speed === 1 ? 2 : 1;
+      if (state.mode === "run") {
+        clearInterval(timer);
+        timer = setInterval(tick, state.speed === 2 ? 600 : 1100);
+      }
+      render();
+    });
+    $("reset-game").addEventListener("click", resetGame);
+    $("cancel-target").addEventListener("click", () => {
+      state.pendingTool = null; state.pendingSwitch = null; state.grabDuck = false;
+      render();
+    });
+    $("shop-toggle").addEventListener("click", () => {
+      const open = $("shop-drawer").classList.toggle("open");
+      $("shop-toggle").setAttribute("aria-expanded", String(open));
+    });
+    document.querySelectorAll("[data-chip]").forEach(btn => btn.addEventListener("click", () => buyChip(btn.dataset.chip)));
+  </script>
+</body>
+</html>
