@@ -19,6 +19,37 @@ namespace AlienAllIn.Editor
         static Font font;
         static readonly Color Ink = new Color(.045f, .075f, .13f);
         static readonly Color Mint = new Color(.40f, .94f, .77f);
+        static readonly Color Gold = new Color(1f, .78f, .25f);
+        static readonly Color Cream = new Color(.94f, .95f, .88f);
+        static readonly Color Muted = new Color(.63f, .76f, .75f);
+        static readonly Color Panel = new Color(.07f, .12f, .16f);
+        static readonly Color Raised = new Color(.10f, .17f, .21f);
+        static readonly Color Track = new Color(.15f, .24f, .28f);
+
+        [MenuItem("Alien All In/Rebuild Gameplay HUD (preserves board)")]
+        public static void RebuildGameplayHUD()
+        {
+            if (!EditorUtility.DisplayDialog("Rebuild Gameplay HUD", "This replaces only the HUD in Gameplay.unity and keeps the board and actors.", "Rebuild HUD", "Cancel")) return;
+            if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
+
+            Scene scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            square = AssetDatabase.LoadAssetAtPath<Sprite>(ArtPath + "/Square.png");
+            font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            GameplayController game = Object.FindAnyObjectByType<GameplayController>();
+            if (!game)
+            {
+                Debug.LogError("ALIEN ALL IN: GameplayController was not found in Gameplay.unity.");
+                return;
+            }
+
+            if (game.hud) Object.DestroyImmediate(game.hud.gameObject);
+            game.hud = MakeHUD(game);
+            game.ResetStage();
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            AssetDatabase.SaveAssets();
+            Debug.Log("ALIEN ALL IN: replaced Gameplay HUD while preserving the board and actors.");
+        }
 
         [MenuItem("Alien All In/Rebuild Gameplay scene (replaces scene)")]
         public static void BuildScene()
@@ -190,21 +221,72 @@ namespace AlienAllIn.Editor
             scaler.referenceResolution = new Vector2(1600, 900); scaler.matchWidthOrHeight = .5f;
             var hud = canvasObject.GetComponent<GameplayHUD>(); hud.game = game;
             Transform parent = canvasObject.transform;
-            var background = Rect("Sidebar", parent, .72f, .11f, .97f, .90f).gameObject.AddComponent<Image>(); background.color = new Color(.08f, .13f, .20f);
-            Label("ALIEN ALL IN", parent, .045f, .93f, .69f, .99f, 36, Color.white);
-            hud.phaseText = Label("", parent, .74f, .93f, .98f, .99f, 24, Mint);
-            hud.cashText = Label("", parent, .745f, .86f, .96f, .90f, 18, new Color(1, .83f, .37f));
-            hud.objectiveText = Label("", parent, .745f, .55f, .95f, .79f, 18, Color.white);
-            hud.selectedText = Label("", parent, .745f, .32f, .95f, .54f, 17, new Color(.72f, .84f, .88f));
-            hud.messageText = Label("", parent, .045f, .018f, .96f, .077f, 18, Color.white);
-            hud.startButton = Button("START", parent, .745f, .80f, .945f, .85f, Mint, gameObjectName: "Start Shift");
-            hud.duckButton = Button("DUCK", parent, .745f, .25f, .84f, .30f, new Color(1, .82f, .23f));
-            hud.sealButton = Button("SEAL", parent, .85f, .25f, .945f, .30f, Mint);
-            hud.trampolineButton = Button("", parent, .745f, .185f, .945f, .235f, new Color(.52f, .81f, .93f), gameObjectName: "Use Trampoline");
+            AddPanel("Top rail", parent, 0, .90f, 1, 1, Ink);
+            AddPanel("Status rail", parent, 0, 0, .71f, .095f, Ink);
+            AddPanel("Game controls", parent, .72f, .105f, .985f, .90f, Panel);
+            AddPanel("Panel top line", parent, .72f, .895f, .985f, .90f, Mint);
+
+            Label("ALIEN ALL IN", parent, .04f, .915f, .67f, .985f, 38, Cream, FontStyle.Bold, TextAnchor.MiddleLeft);
+            hud.phaseText = Label("", parent, .72f, .915f, .975f, .985f, 20, Mint, FontStyle.Bold, TextAnchor.MiddleRight);
+            hud.cashText = Label("000", parent, .84f, .822f, .975f, .89f, 32, Gold, FontStyle.Bold, TextAnchor.MiddleRight);
+            Label("CASH", parent, .745f, .822f, .835f, .89f, 16, Muted, FontStyle.Bold, TextAnchor.MiddleLeft);
+            AddPanel("Cash divider", parent, .745f, .807f, .975f, .81f, Track);
+            hud.objectiveText = Label("OBJECTIVES", parent, .745f, .765f, .975f, .80f, 18, Cream, FontStyle.Bold, TextAnchor.MiddleLeft);
+
+            hud.activityRows = new GameplayActivityReadout[game.activities.Length];
+            for (int i = 0; i < game.activities.Length; i++)
+            {
+                float top = .75f - i * .112f;
+                hud.activityRows[i] = ActivityReadout(game.activities[i], parent, top - .095f, top);
+            }
+
+            AddPanel("Crew divider", parent, .745f, .522f, .975f, .525f, Track);
+            Label("CREW", parent, .745f, .485f, .975f, .518f, 17, Cream, FontStyle.Bold, TextAnchor.MiddleLeft);
+            hud.selectedText = Label("", parent, .745f, .402f, .975f, .48f, 17, Cream, FontStyle.Bold, TextAnchor.MiddleLeft);
+            AddPanel("Health track", parent, .745f, .389f, .975f, .399f, Track);
+            hud.selectedHealthFill = AddFill("Health fill", parent, .745f, .389f, .975f, .399f);
+
+            hud.duckButton = Button("DUCK", parent, .745f, .34f, .854f, .386f, Raised, Muted, 15);
+            hud.sealButton = Button("SEAL", parent, .866f, .34f, .975f, .386f, Raised, Muted, 15);
+            hud.startButton = Button("START SHIFT", parent, .745f, .225f, .975f, .275f, Mint, Ink, 18, "Start Shift");
+            hud.trampolineButton = Button("", parent, .745f, .166f, .975f, .216f, new Color(.52f, .81f, .93f), Ink, 15, "Use Trampoline");
             hud.toolText = hud.trampolineButton.GetComponentInChildren<Text>();
-            hud.pauseButton = Button("PAUSE", parent, .745f, .12f, .84f, .17f, new Color(.56f, .65f, .73f));
-            hud.restartButton = Button("RESTART", parent, .85f, .12f, .945f, .17f, new Color(.56f, .65f, .73f));
+            hud.pauseButton = Button("PAUSE", parent, .745f, .112f, .854f, .157f, Raised, Cream, 14);
+            hud.restartButton = Button("RESTART", parent, .866f, .112f, .975f, .157f, Raised, Cream, 14);
+            hud.messageText = Label("", parent, .04f, .022f, .68f, .073f, 17, Cream, FontStyle.Normal, TextAnchor.MiddleLeft);
             return hud;
+        }
+
+        static GameplayActivityReadout ActivityReadout(ActivityStation activity, Transform parent, float y0, float y1)
+        {
+            RectTransform root = Rect(activity.activityName + " readout", parent, .745f, y0, .975f, y1);
+            var row = new GameplayActivityReadout { root = root.gameObject };
+            Color accent = activity.requiredKind == ActorKind.Duck ? Gold : Mint;
+            row.nameText = Label(activity.activityName, root, 0, .52f, .68f, 1, 18, Cream, FontStyle.Bold, TextAnchor.MiddleLeft);
+            row.progressText = Label("0%", root, .68f, .52f, 1, 1, 17, accent, FontStyle.Bold, TextAnchor.MiddleRight);
+            row.kindText = Label(activity.requiredKind.ToString().ToUpperInvariant(), root, 0, .15f, 1, .49f, 13, Muted, FontStyle.Normal, TextAnchor.MiddleLeft);
+            AddPanel("Progress track", root, 0, 0, 1, .09f, Track);
+            row.progressFill = AddFill("Progress fill", root, 0, 0, 1, .09f);
+            return row;
+        }
+
+        static Image AddPanel(string name, Transform parent, float x0, float y0, float x1, float y1, Color color)
+        {
+            Image image = Rect(name, parent, x0, y0, x1, y1).gameObject.AddComponent<Image>();
+            image.color = color;
+            image.raycastTarget = false;
+            return image;
+        }
+
+        static Image AddFill(string name, Transform parent, float x0, float y0, float x1, float y1)
+        {
+            Image image = AddPanel(name, parent, x0, y0, x1, y1, Color.white);
+            image.sprite = square;
+            image.type = Image.Type.Filled;
+            image.fillMethod = Image.FillMethod.Horizontal;
+            image.fillOrigin = (int)Image.OriginHorizontal.Left;
+            image.fillAmount = 0;
+            return image;
         }
 
         static RectTransform Rect(string name, Transform parent, float x0, float y0, float x1, float y1)
@@ -214,21 +296,30 @@ namespace AlienAllIn.Editor
             return rect;
         }
 
-        static Text Label(string text, Transform parent, float x0, float y0, float x1, float y1, int size, Color color)
+        static Text Label(string text, Transform parent, float x0, float y0, float x1, float y1, int size, Color color,
+            FontStyle style = FontStyle.Normal, TextAnchor alignment = TextAnchor.UpperLeft)
         {
             var label = Rect(string.IsNullOrEmpty(text) ? "Readout" : text, parent, x0, y0, x1, y1).gameObject.AddComponent<Text>();
-            label.font = font; label.fontSize = size; label.text = text; label.color = color;
-            label.alignment = TextAnchor.UpperLeft; label.raycastTarget = false;
-            label.horizontalOverflow = HorizontalWrapMode.Wrap; label.verticalOverflow = VerticalWrapMode.Truncate;
+            label.font = font; label.fontSize = size; label.fontStyle = style; label.text = text; label.color = color;
+            label.alignment = alignment; label.raycastTarget = false;
+            label.horizontalOverflow = HorizontalWrapMode.Overflow; label.verticalOverflow = VerticalWrapMode.Overflow;
             return label;
         }
 
-        static Button Button(string text, Transform parent, float x0, float y0, float x1, float y1, Color color, string gameObjectName = null)
+        static Button Button(string text, Transform parent, float x0, float y0, float x1, float y1,
+            Color backgroundColor, Color textColor, int fontSize, string gameObjectName = null)
         {
             var rect = Rect(gameObjectName ?? text, parent, x0, y0, x1, y1);
-            var image = rect.gameObject.AddComponent<Image>(); image.color = color;
+            var image = rect.gameObject.AddComponent<Image>(); image.color = Color.white;
             var button = rect.gameObject.AddComponent<Button>(); button.targetGraphic = image;
-            var label = Label(text, rect, .03f, .08f, .97f, .92f, 16, Ink); label.alignment = TextAnchor.MiddleCenter;
+            ColorBlock colors = button.colors;
+            colors.normalColor = backgroundColor;
+            colors.highlightedColor = Color.Lerp(backgroundColor, Color.white, .12f);
+            colors.pressedColor = Color.Lerp(backgroundColor, Ink, .18f);
+            colors.disabledColor = Raised;
+            colors.fadeDuration = .08f;
+            button.colors = colors;
+            var label = Label(text, rect, .04f, .08f, .96f, .92f, fontSize, textColor, FontStyle.Bold, TextAnchor.MiddleCenter);
             return button;
         }
     }
