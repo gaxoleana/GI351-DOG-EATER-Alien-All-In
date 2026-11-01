@@ -1,5 +1,22 @@
 # Play the Unity core gameplay scene
 
+## Stage 1 entry scene
+
+`Assets/Scenes/Main.unity` is the first enabled Build Settings scene. It contains
+the Stage 1 board shell: a 10x10 `BoardGrid`, with a 3x3 area open at 0% run
+progress and locked cells visible in a darker color. It intentionally has no
+actors, Process machines, combat, or run timer.
+
+`StageGridProgression.ApplyRunProgress` accepts normalized progress from a
+future run system. Prototype thresholds open 5x5 at 25%, 7x7 at 50%, and the
+full 10x10 board at 75%. It exposes optional authored player start cells and
+the currently open cells as potential Process spawn candidates. The candidate
+list does not spawn machines, choose their type, or filter occupied cells.
+`playerStartCells` is empty until a starting formation is specified.
+
+`Assets/Scenes/Gameplay.unity` remains the playable duck + seal reference scene
+described below; it was kept separate from the Stage 1 entry scene.
+
 Open `Assets/Scenes/Gameplay.unity` in Unity **6000.5.10f1** and press Play.
 The board, all 100 cells, duck, seal, two activity stations, supply, HUD and
 references are saved scene objects. They are visible and editable before Play.

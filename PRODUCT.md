@@ -25,11 +25,16 @@ The game combines automated alien behavior with tactical placement, activity pro
 
 ## Operating Context
 
-The current request is an editable Unity gameplay scene with a 10x10 board,
-one world unit per cell, a duck, reliable cell occupancy and a playable core loop.
-`Assets/Scenes/Gameplay.unity` implements a duck + seal stage with fixed casino
-and jump-rope activities, enemies, supplies, Switch relocation and win/lose/reset.
-See `GAMEPLAY.md` for controls, Inspector fields, verification and scope.
+`Assets/Scenes/Main.unity` is the first enabled Build Settings scene and contains
+the Stage 1 board shell: a 10x10 `BoardGrid`, one world unit per cell, and a 3x3
+opening area. `StageGridProgression` accepts normalized run progress and expands
+to 5x5, 7x7, then 10x10 using editable prototype thresholds. Actors, a run timer,
+and Process machines are not part of this scene yet.
+
+`Assets/Scenes/Gameplay.unity` remains the playable duck + seal reference with
+fixed casino and jump-rope activities, enemies, supplies, Switch relocation,
+and win/lose/reset. See `GAMEPLAY.md` for both scenes, controls, Inspector fields,
+and prototype scope.
 
 ## Capabilities and Constraints
 
@@ -40,6 +45,7 @@ See `GAMEPLAY.md` for controls, Inspector fields, verification and scope.
 - Enemy HP is stated as 10. Alien HP, attack cadence, damage, objective duration, enemy pathing, shop prices, and other balance values are not specified and must be labeled as prototype assumptions.
 - The gambling theme is present, but a betting mechanic is not yet specified.
 - The final game platform, full market/chip rules, and which items are included in the first build are undecided.
+- The Stage 1 scene exposes currently open cells as future Process spawn candidates; it does not implement spawning, type selection, or no-valid-cell handling.
 
 ## Brand Commitments
 
@@ -51,7 +57,7 @@ See `GAMEPLAY.md` for controls, Inspector fields, verification and scope.
 
 ## Evidence on Hand
 
-- User-provided GDD: `Alien All In.pdf` (attached to the Codex chat).
+- User-provided GDD: [Alien All In Game Design](https://docs.google.com/document/d/1cEkx_ig7Z5lBK1WUKFDgsZKwTtKT6dMUzEAeKJm8BAQ/edit?tab=t.0).
 - Playable reference: https://seal-the-deal-arcade-1030.toonender.chatgpt.site/
 - The Unity scene uses simple geometric sprite placeholders, not final art.
 

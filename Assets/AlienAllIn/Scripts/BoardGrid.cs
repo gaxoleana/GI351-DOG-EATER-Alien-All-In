@@ -15,10 +15,22 @@ namespace AlienAllIn
         [Header("Currently open area")]
         [SerializeField, Min(1)] int activeWidth = 10;
         [SerializeField, Min(1)] int activeHeight = 10;
+        [SerializeField, Tooltip("Keeps cells outside the active area visible with their locked color. Locked cells remain unavailable to gameplay queries.")]
+        bool keepLockedCellsVisible;
         BoardCell[,] cells;
 
         public int ActiveWidth => activeWidth;
         public int ActiveHeight => activeHeight;
+        public bool KeepLockedCellsVisible
+        {
+            get => keepLockedCellsVisible;
+            set
+            {
+                if (keepLockedCellsVisible == value) return;
+                keepLockedCellsVisible = value;
+                SetActiveSize(activeWidth, activeHeight);
+            }
+        }
         public Vector2Int ActiveMinCell => new Vector2Int((width - activeWidth + 1) / 2, (height - activeHeight + 1) / 2);
         public Vector3 ActiveCenter => transform.TransformPoint(new Vector3(
             (ActiveMinCell.x + activeWidth * .5f) * cellSize,
@@ -60,7 +72,9 @@ namespace AlienAllIn
                 Vector2Int coordinate = cell.coordinate;
                 bool inside = coordinate.x >= min.x && coordinate.y >= min.y &&
                               coordinate.x < min.x + activeWidth && coordinate.y < min.y + activeHeight;
-                if (cell.gameObject.activeSelf != inside) cell.gameObject.SetActive(inside);
+                cell.SetUnlocked(inside);
+                bool visible = inside || keepLockedCellsVisible;
+                if (cell.gameObject.activeSelf != visible) cell.gameObject.SetActive(visible);
             }
 
             return changed;
