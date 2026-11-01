@@ -7,7 +7,7 @@ namespace AlienAllIn
     public enum ActorState
     {
         Idle, Moving, Collecting, Working, Fleeing, Hiding, Defending, Dead,
-        Panic, Inflating, UsingUltimate, Eating, Shielding, Stunned
+        Panic, Inflating, UsingUltimate, Eating, Shielding, Stunned, Kidnapped
     }
 
     [DisallowMultipleComponent]
@@ -16,6 +16,9 @@ namespace AlienAllIn
         public ActorKind kind;
         [Tooltip("Only active run members contribute to the RunLoop defeat condition. Enemies are never run members.")]
         public bool countsAsActiveRunMember = true;
+        [Tooltip("Main's Duck is captured instead of taking HP damage. Leave off in the legacy reference scene.")]
+        public bool invulnerable;
+        public bool useGridAttackRange;
         public BoardGrid board;
         [Min(1)] public float maxHealth = 30;
         [Min(.01f)] public float moveSpeed = 2.5f;
@@ -140,7 +143,7 @@ namespace AlienAllIn
 
         public float Hurt(float amount)
         {
-            if (!Alive) return 0f;
+            if (!Alive || invulnerable) return 0f;
             float before = health;
             float applied = Mathf.Max(0f, amount) * (1f - damageReduction);
             health = Mathf.Max(0, health - applied);
@@ -157,9 +160,20 @@ namespace AlienAllIn
             return health - before;
         }
 
+        public void DebugRestoreHealth()
+        {
+            health = EffectiveMaxHealth;
+            HitTimer = 0;
+            ResolveBodyRenderer();
+            if (bodyRenderer) bodyRenderer.color = originalBodyColor;
+            if (state == ActorState.Dead) state = ActorState.Idle;
+            gameObject.SetActive(true);
+            RefreshCell();
+        }
+
         public void Eliminate()
         {
-            if (!Alive) return;
+            if (!Alive || invulnerable) return;
             health = 0f;
             state = ActorState.Dead;
             gameObject.SetActive(false);
@@ -255,6 +269,18 @@ namespace AlienAllIn
         void OnDrawGizmosSelected()
         {
             if (kind == ActorKind.Duck) return;
+            if (kind == ActorKind.Seal && useGridAttackRange && board)
+            {
+                board.TryWorldToCell(transform.position, out var center);
+                Gizmos.color = new Color(1, .6f, .1f, .7f);
+                for (int y=-2;y<=2;y++) for (int x=-2;x<=2;x++)
+                {
+                    var offset = new Vector2Int(x,y); var cell = center + offset;
+                    if (SealGridRange.Contains(offset) && board.Contains(cell))
+                        Gizmos.DrawWireCube(board.CellCenter(cell), board.transform.TransformVector(Vector3.one * board.cellSize * .96f));
+                }
+                return;
+            }
             Gizmos.color = new Color(.4f, .94f, .77f, .65f);
             Vector3 previous = transform.position + Vector3.right * attackRange;
             for (int i = 1; i <= 64; i++)

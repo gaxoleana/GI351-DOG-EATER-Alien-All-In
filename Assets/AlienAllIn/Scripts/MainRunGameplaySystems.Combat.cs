@@ -37,14 +37,21 @@ namespace AlienAllIn
         readonly HashSet<GridActor> awardedKills = new HashSet<GridActor>();
         readonly List<ProjectileRuntime> projectiles = new List<ProjectileRuntime>();
         readonly List<RippleRuntime> sealRipples = new List<RippleRuntime>();
-        readonly Dictionary<GridActor, float> pufferHitClocks = new Dictionary<GridActor, float>();
         float enemySpawnClock;
         int enemySpawnIndex;
         int nextSpawnEdge;
         float sealAttackClock;
         float catAttackClock;
-        float pufferInflateClock;
-        float pufferFloatClock;
+        float pufferLockClock, pufferRestClock;
+        GridActor pufferTarget;
+        Object pufferLastContact;
+        int pufferBounces;
+        public PufferAttackPhase PufferPhase { get; private set; }
+        public GridActor PufferTarget => pufferTarget;
+        public int PufferBounceCount => pufferBounces;
+        [SerializeField] AttackVfx attackVfx;
+        float sealTelegraphClock;
+        bool sealAttackPending;
         Vector2 pufferDirection;
         float catLaserClock;
 
@@ -68,11 +75,12 @@ namespace AlienAllIn
             awardedKills.Clear();
             projectiles.Clear();
             sealRipples.Clear();
-            pufferHitClocks.Clear();
             enemySpawnClock = Mathf.Max(.1f, firstEnemyDelaySeconds);
             enemySpawnIndex = nextSpawnEdge = 0;
             sealAttackClock = catAttackClock = 0f;
-            pufferInflateClock = pufferFloatClock = 0f;
+            ResetPufferCycle();
+            sealAttackPending = false; sealTelegraphClock = 0;
+            if (attackVfx) attackVfx.Clear();
             pufferDirection = Vector2.zero;
             catLaserClock = 0f;
         }
@@ -90,6 +98,7 @@ namespace AlienAllIn
 
         void AdvanceEnemySpawner(float dt)
         {
+            if (DebugStopEnemySpawns) return;
             enemySpawnClock -= dt;
             if (enemySpawnClock > 0f) return;
             enemySpawnClock = Mathf.Max(.1f, enemySpawnIntervalSeconds);
@@ -97,21 +106,32 @@ namespace AlienAllIn
             foreach (GridActor existingEnemy in enemies) if (existingEnemy && existingEnemy.Alive) aliveCount++;
             if (aliveCount >= Mathf.Max(1, maxEnemies)) return;
 
+            EnemyPrototypeSettings settings = ChooseEnemySettings();
+            SpawnEnemy(settings, false);
+        }
+
+        GridActor SpawnEnemy(EnemyPrototypeSettings settings, bool allowOpenCellFallback)
+        {
+            if (settings == null) return null;
             blockedSpawnCells.Clear();
             foreach (ActivityStation station in stations) if (station) blockedSpawnCells.Add(station.Cell);
             foreach (FieldPickup pickup in fieldItems)
-                if (pickup && board.TryWorldToCell(pickup.transform.position, out Vector2Int pickupCell)) blockedSpawnCells.Add(pickupCell);
-
-            GridActor enemy = GridEnemySpawner.SpawnAtActiveEdges(board, enemyPrefab, enemyContainer,
+                if (pickup && board.TryWorldToCell(pickup.transform.position, out Vector2Int occupied)) blockedSpawnCells.Add(occupied);
+            GridActor enemy = GridEnemySpawner.SpawnAtActiveEdges(board, settings.prefab ? settings.prefab : enemyPrefab, enemyContainer,
                 ref enemySpawnIndex, ref nextSpawnEdge, blockedSpawnCells);
-            if (!enemy) return;
-            EnemyPrototypeSettings settings = ChooseEnemySettings();
-            if (settings == null) { Destroy(enemy.gameObject); return; }
+            if (!enemy && allowOpenCellFallback && TryChooseOpenCell(false, out Vector2Int cell))
+            {
+                enemy = Instantiate(settings.prefab ? settings.prefab : enemyPrefab, board.CellCenter(cell), Quaternion.identity, enemyContainer);
+                enemySpawnIndex++;
+                enemy.board = board;
+            }
+            if (!enemy) return null;
             enemy.name = $"{settings.archetype} {enemySpawnIndex:00}";
             ConfigureEnemy(enemy, settings);
             enemies.Add(enemy);
             enemyRuntime[enemy] = new EnemyRuntime { settings = settings };
             RunDataChanged?.Invoke();
+            return enemy;
         }
 
         EnemyPrototypeSettings ChooseEnemySettings()
@@ -147,7 +167,7 @@ namespace AlienAllIn
             // ResetActor clears runtime damage mitigation; apply the Pan's prototype block afterwards.
             enemy.SetDamageReduction(settings.archetype == EnemyArchetype.PanShield
                 ? settings.shieldedDamageReduction : 0f);
-            enemy.SetPresentationColor(settings.displayColor);
+            enemy.SetPresentationColor(settings.prefab ? Color.white : settings.displayColor);
             enemy.State = settings.archetype == EnemyArchetype.PanShield ? ActorState.Shielding : ActorState.Idle;
         }
 
@@ -157,6 +177,8 @@ namespace AlienAllIn
             {
                 GridActor enemy = enemies[i];
                 if (!enemy || !enemy.Alive || !enemy.gameObject.activeInHierarchy || !enemyRuntime.TryGetValue(enemy, out EnemyRuntime runtime)) continue;
+                enemy.AdvanceRuntime(dt);
+                if (DuckCaptured && enemy == duckCaptor) { enemy.State = ActorState.Idle; continue; }
                 runtime.specialClock -= dt;
                 runtime.stunRemaining = Mathf.Max(0f, runtime.stunRemaining - dt);
                 enemy.AttackTimer = Mathf.Max(0f, enemy.AttackTimer - dt);
@@ -212,8 +234,7 @@ namespace AlienAllIn
                 enemy.State = ActorState.Defending;
                 if (enemy.AttackTimer > 0f) return;
                 enemy.AttackTimer = enemy.attackInterval;
-                target.Hurt(enemy.damage);
-                InterruptWorkerAt(target);
+                EnemyHitActor(enemy, target, enemy.damage);
                 return;
             }
             enemy.State = ActorState.Moving;
@@ -245,7 +266,7 @@ namespace AlienAllIn
             float distance = Vector3.Distance(enemy.transform.position, target.transform.position);
             bool targetDuck = target.kind == ActorKind.Duck;
             float preferredRange = Mathf.Max(.3f, runtime.settings.specialValue);
-            if (distance > enemy.attackRange)
+            if (distance > (targetDuck ? .65f : enemy.attackRange))
             {
                 enemy.State = ActorState.Moving;
                 enemy.MoveTowards(target.transform.position, dt);
@@ -259,7 +280,7 @@ namespace AlienAllIn
             }
             else enemy.State = ActorState.Idle;
 
-            if (distance <= enemy.attackRange && enemy.AttackTimer <= 0f)
+            if (distance <= (targetDuck ? .65f : enemy.attackRange) && enemy.AttackTimer <= 0f)
             {
                 enemy.AttackTimer = enemy.attackInterval;
                 SpawnProjectile(enemy, target, runtime.settings);
@@ -286,7 +307,7 @@ namespace AlienAllIn
             foreach (GridActor actor in runLoop.Survivors)
             {
                 if (!actor || !actor.Alive || Vector3.Distance(actor.transform.position, enemy.transform.position) > radius) continue;
-                actor.Hurt(enemy.damage);
+                EnemyHitActor(enemy, actor, enemy.damage);
                 InterruptWorkerAt(actor);
             }
         }
@@ -314,7 +335,7 @@ namespace AlienAllIn
             float distance = float.PositiveInfinity;
             foreach (GridActor actor in runLoop.Survivors)
             {
-                if (!actor || !actor.Alive || (duckOnly && actor.kind != ActorKind.Duck)) continue;
+                if (!actor || !actor.Alive || (actor == duck && (DuckCaptured || duckGraceRemaining > 0)) || (duckOnly && actor.kind != ActorKind.Duck)) continue;
                 if (!duckOnly && actor.kind == ActorKind.Duck && actor.State == ActorState.Hiding)
                 { hiddenDuck = actor; continue; }
                 float candidate = (actor.transform.position - from).sqrMagnitude;
@@ -354,9 +375,9 @@ namespace AlienAllIn
 
         void TickTeamCombat(float dt)
         {
-            if (seal && seal.Alive && !TickOwnerProcess(seal, dt)) TickSeal(dt);
-            if (cat && cat.Alive && !TickOwnerProcess(cat, dt)) TickCat(dt);
-            if (pufferfish && pufferfish.Alive && !TickOwnerProcess(pufferfish, dt)) TickPufferCombatState(dt);
+            if (seal && seal.Alive && !manualDestinations.ContainsKey(seal) && !TickOwnerProcess(seal, dt)) TickSeal(dt);
+            if (cat && cat.Alive && !manualDestinations.ContainsKey(cat) && !TickOwnerProcess(cat, dt)) TickCat(dt);
+            if (pufferfish && pufferfish.Alive && !manualDestinations.ContainsKey(pufferfish) && !TickOwnerProcess(pufferfish, dt)) TickPufferCombatState(dt);
         }
 
         bool TickOwnerProcess(GridActor actor, float dt)
@@ -373,25 +394,45 @@ namespace AlienAllIn
             }
             if (!assigned) return false;
             if (actor.IsUltimateActive) return false;
-            if (Vector3.Distance(actor.transform.position, assigned.transform.position) > .15f * board.cellSize)
-            {
-                actor.State = ActorState.Moving;
-                MoveActorAlongGrid(actor, assigned.transform.position, dt, 1f);
-            }
-            else actor.State = ActorState.Working;
+            if (Vector3.Distance(actor.transform.position, assigned.transform.position) > .15f * board.cellSize) return false;
+            if (actor == pufferfish) ResetPufferCycle();
+            actor.State = ActorState.Working;
             return true;
         }
 
         void TickSeal(float dt)
         {
             if (seal.IsUltimateActive) return;
+            if (sealAttackPending)
+            {
+                sealTelegraphClock -= dt;
+                if (sealTelegraphClock > 0) return;
+                sealAttackPending = false;
+                if (seal.TryGetComponent(out AlienAnimationDriver animation)) animation.PlayAttack();
+                seal.RefreshCell();
+                foreach (var victim in enemies)
+                {
+                    if (!victim || !victim.Alive) continue;
+                    victim.RefreshCell();
+                    if (!SealGridRange.Contains(victim.CurrentCell - seal.CurrentCell)) continue;
+                    float dealt = victim.Hurt(seal.EffectiveDamage);
+                    RegisterEnemyHit(seal, victim, dealt, false);
+                    Vector3 pushed = victim.transform.position + (victim.transform.position - seal.transform.position).normalized * sealKnockbackDistance;
+                    if (victim.Alive && board.TryWorldToCell(pushed, out _)) { victim.transform.position = pushed; victim.RefreshCell(); }
+                }
+                return;
+            }
             sealAttackClock -= dt;
-            GridActor target = FindNearestEnemy(seal.transform.position, seal.attackRange);
-            if (!target || sealAttackClock > 0f) return;
+            seal.RefreshCell(); bool inRange = false;
+            foreach (var enemy in enemies)
+            {
+                if (!enemy || !enemy.Alive) continue; enemy.RefreshCell();
+                if (SealGridRange.Contains(enemy.CurrentCell - seal.CurrentCell)) { inRange = true; break; }
+            }
+            if (!inRange || sealAttackClock > 0) return;
             sealAttackClock = seal.EffectiveAttackInterval;
-            if (seal.TryGetComponent(out AlienAnimationDriver animation)) animation.PlayAttack();
-            CombatAndSpawnRules.ResolveSealAoe(seal, enemies, board, seal.attackRange, seal.EffectiveDamage,
-                sealKnockbackDistance, (victim, dealt) => RegisterEnemyHit(seal, victim, dealt, false));
+            sealAttackPending = true; sealTelegraphClock = .16f;
+            if (attackVfx) attackVfx.SealGrid(seal.transform.position, false, .25f);
         }
 
         void TickCat(float dt)
@@ -402,6 +443,7 @@ namespace AlienAllIn
             if (!target || catAttackClock > 0f) return;
             catAttackClock = cat.EffectiveAttackInterval;
             if (cat.TryGetComponent(out AlienAnimationDriver animation)) animation.PlayAttack();
+            if (attackVfx) attackVfx.CatLaser(cat.transform.position, target.transform.position);
             float dealt = target.Hurt(cat.EffectiveDamage);
             RegisterEnemyHit(cat, target, dealt, false);
             if (target.Alive && catStunSeconds > 0f && enemyRuntime.TryGetValue(target, out EnemyRuntime runtime))
@@ -409,98 +451,108 @@ namespace AlienAllIn
             InterruptWorkerAt(target);
         }
 
+        void ResetPufferCycle()
+        {
+            PufferPhase = PufferAttackPhase.Stationary; pufferTarget = null;
+            pufferLockClock = pufferRestClock = 0; pufferBounces = 0;
+            pufferLastContact = null; pufferDirection = Vector2.zero;
+        }
+
+        void StopPuffer()
+        {
+            PufferPhase = PufferAttackPhase.Stationary; pufferTarget = null;
+            pufferDirection = Vector2.zero; pufferLastContact = null;
+            pufferRestClock = pufferfish.EffectiveAttackInterval;
+            pufferfish.State = ActorState.Idle;
+        }
+
         void TickPufferCombatState(float dt)
         {
-            if (pufferfish.IsUltimateActive) return;
-            if (pufferFloatClock > 0f) return;
-            pufferInflateClock += dt;
+            if (PufferPhase == PufferAttackPhase.Launched || PufferPhase == PufferAttackPhase.Bouncing) return;
+            if (PufferPhase == PufferAttackPhase.Stationary)
+            {
+                pufferfish.State = ActorState.Idle;
+                pufferRestClock -= dt;
+                if (pufferRestClock > 0) return;
+                pufferTarget = FindNearestEnemy(pufferfish.transform.position, pufferfish.attackRange);
+                if (!pufferTarget) return;
+                PufferPhase = PufferAttackPhase.Locked;
+                pufferLockClock = pufferInflateSeconds; pufferBounces = 0;
+            }
+            if (!pufferTarget || !pufferTarget.Alive || !board.TryWorldToCell(pufferTarget.transform.position, out _)) { StopPuffer(); return; }
             pufferfish.State = ActorState.Inflating;
-            if (pufferInflateClock < pufferInflateSeconds) return;
-            pufferInflateClock = 0f;
-            pufferFloatClock = pufferFloatSeconds;
-            pufferDirection = Random.insideUnitCircle.normalized;
-            if (pufferDirection.sqrMagnitude < .1f) pufferDirection = Vector2.right;
-            pufferfish.State = ActorState.Moving;
+            pufferLockClock -= dt;
+            if (pufferLockClock > 0) return;
+            pufferDirection = (pufferTarget.transform.position - pufferfish.transform.position).normalized;
+            if (pufferDirection.sqrMagnitude < .01f) pufferDirection = Vector2.right;
+            PufferPhase = PufferAttackPhase.Launched; pufferfish.State = ActorState.Moving;
             if (pufferfish.TryGetComponent(out AlienAnimationDriver animation)) animation.PlayAttack();
         }
 
         void TickPufferMovement(float dt)
         {
-            if (!pufferfish || !pufferfish.Alive || (!pufferfish.IsUltimateActive && pufferFloatClock <= 0f)) return;
-            pufferFloatClock = Mathf.Max(0f, pufferFloatClock - dt);
-            if (!pufferfish.IsUltimateActive && pufferFloatClock <= 0f) { pufferfish.State = ActorState.Idle; return; }
+            if (!pufferfish || !pufferfish.Alive || manualDestinations.ContainsKey(pufferfish) ||
+                (PufferPhase != PufferAttackPhase.Launched && PufferPhase != PufferAttackPhase.Bouncing)) return;
             float speed = pufferFloatSpeed * (pufferfish.IsUltimateActive ? pufferUltimateSpeedMultiplier : 1f);
-            float damageMultiplier = pufferfish.IsUltimateActive ? pufferUltimateDamageMultiplier : 1f;
-            Vector3 current = pufferfish.transform.position;
-            Vector3 proposed = current + (Vector3)(pufferDirection * speed * dt);
-            if (!board.TryWorldToCell(proposed, out _))
+            int steps = Mathf.Max(1, Mathf.CeilToInt(speed * Mathf.Min(dt, .25f) / .08f));
+            float step = speed * Mathf.Min(dt, .25f) / steps;
+            for (int i = 0; i < steps; i++)
             {
-                Vector2Int outsideCell;
-                board.TryWorldToCell(proposed, out outsideCell);
-                Vector2Int min = board.ActiveMinCell;
-                if (outsideCell.x < min.x || outsideCell.x >= min.x + board.ActiveWidth) pufferDirection.x = -pufferDirection.x;
-                if (outsideCell.y < min.y || outsideCell.y >= min.y + board.ActiveHeight) pufferDirection.y = -pufferDirection.y;
-                pufferDirection = pufferDirection.normalized;
-                proposed = current + (Vector3)(pufferDirection * speed * dt);
-            }
-
-            bool bounced = false;
-            GridActor collision = FindNearestEnemy(proposed, pufferCollisionRadius + .08f);
-            if (collision)
-            {
-                pufferDirection = (current - collision.transform.position).normalized;
-                if (pufferDirection.sqrMagnitude < .01f) pufferDirection = Vector2.right;
-                if (!pufferHitClocks.TryGetValue(collision, out float hitClock) || hitClock <= 0f)
+                Vector3 current = pufferfish.transform.position;
+                Vector3 proposed = current + (Vector3)(pufferDirection * step);
+                Object contact = null; Vector2 normal = Vector2.zero;
+                GridActor victim = null;
+                if (!board.TryWorldToCell(proposed, out Vector2Int outside))
                 {
-                    pufferHitClocks[collision] = pufferRepeatHitSeconds;
-                    float dealt = collision.Hurt(pufferfish.EffectiveDamage * pufferDamageMultiplier * damageMultiplier);
-                    RegisterEnemyHit(pufferfish, collision, dealt, pufferfish.IsUltimateActive);
-                    InterruptWorkerAt(collision);
+                    Vector2Int min = board.ActiveMinCell;
+                    bool xWall = outside.x < min.x || outside.x >= min.x + board.ActiveWidth;
+                    normal = xWall ? new Vector2(-Mathf.Sign(pufferDirection.x), 0) : new Vector2(0, -Mathf.Sign(pufferDirection.y));
+                    contact = board;
                 }
-                proposed = current + (Vector3)(pufferDirection * speed * dt);
-                bounced = true;
-            }
-
-            if (!bounced)
-            {
-                foreach (ActivityStation station in stations)
+                else
                 {
-                    if (!station || Vector3.Distance(proposed, station.transform.position) >= pufferCollisionRadius + .2f) continue;
-                    pufferDirection = (current - station.transform.position).normalized;
-                    if (pufferDirection.sqrMagnitude < .01f) pufferDirection = Vector2.right;
-                    proposed = current + (Vector3)(pufferDirection * speed * dt);
-                    bounced = true;
-                    break;
+                    foreach (var enemy in enemies)
+                    {
+                        if (!enemy || !enemy.Alive || Vector3.Distance(proposed, enemy.transform.position) > pufferCollisionRadius + .18f) continue;
+                        if (enemy == pufferLastContact) continue;
+                        contact = victim = enemy; normal = current - enemy.transform.position; break;
+                    }
+                    if (!contact) foreach (var station in stations)
+                    {
+                        if (!station || station == pufferLastContact || Vector3.Distance(proposed, station.transform.position) > pufferCollisionRadius + .2f) continue;
+                        contact = station; normal = current - station.transform.position; break;
+                    }
+                    if (!contact) foreach (var ally in runLoop.Survivors)
+                    {
+                        if (!ally || ally == pufferfish || !ally.Alive || ally == pufferLastContact || Vector3.Distance(proposed, ally.transform.position) > pufferCollisionRadius + .2f) continue;
+                        contact = ally; normal = current - ally.transform.position; break;
+                    }
                 }
-            }
-
-            if (!bounced)
-            {
-                foreach (GridActor ally in runLoop.Survivors)
+                if (contact)
                 {
-                    if (!ally || ally == pufferfish || !ally.Alive || Vector3.Distance(proposed, ally.transform.position) >= pufferCollisionRadius + .2f) continue;
-                    pufferDirection = (current - ally.transform.position).normalized;
-                    if (pufferDirection.sqrMagnitude < .01f) pufferDirection = Vector2.right;
-                    proposed = current + (Vector3)(pufferDirection * speed * dt);
-                    bounced = true;
-                    break;
+                    if (normal.sqrMagnitude < .001f) normal = -pufferDirection;
+                    pufferDirection = Vector2.Reflect(pufferDirection, normal.normalized).normalized;
+                    pufferLastContact = contact; pufferBounces++;
+                    if (victim)
+                    {
+                        float multiplier = pufferfish.IsUltimateActive ? pufferUltimateDamageMultiplier : 1;
+                        float dealt = victim.Hurt(pufferfish.EffectiveDamage * pufferDamageMultiplier * multiplier);
+                        RegisterEnemyHit(pufferfish, victim, dealt, pufferfish.IsUltimateActive);
+                    }
+                    if (pufferBounces >= 2) { StopPuffer(); break; }
+                    PufferPhase = PufferAttackPhase.Bouncing;
+                    proposed = current + (Vector3)(pufferDirection * step);
                 }
+                else if (pufferLastContact == board) pufferLastContact = null;
+                else if (!pufferLastContact) pufferLastContact = null;
+                else if (pufferLastContact is Component previous && Vector3.Distance(current, previous.transform.position) > pufferCollisionRadius + .32f) pufferLastContact = null;
+                if (board.TryWorldToCell(proposed, out _)) pufferfish.transform.position = proposed;
             }
-
-            if (!board.TryWorldToCell(proposed, out _)) proposed = current;
-            pufferfish.transform.position = proposed;
             pufferfish.RefreshCell();
-            pufferfish.State = ActorState.Moving;
         }
 
         void TickProjectiles(float dt)
         {
-            var hitEnemies = new List<GridActor>(pufferHitClocks.Keys);
-            foreach (GridActor enemy in hitEnemies)
-            {
-                if (!enemy) { pufferHitClocks.Remove(enemy); continue; }
-                pufferHitClocks[enemy] = Mathf.Max(0f, pufferHitClocks[enemy] - dt);
-            }
             for (int i = projectiles.Count - 1; i >= 0; i--)
             {
                 ProjectileRuntime projectile = projectiles[i];
@@ -509,8 +561,7 @@ namespace AlienAllIn
                 Transform shot = projectile.gameObject.transform;
                 shot.position = Vector3.MoveTowards(shot.position, projectile.target.transform.position, projectile.speed * dt);
                 if (Vector3.Distance(shot.position, projectile.target.transform.position) > toasterProjectileRadius + .1f) continue;
-                projectile.target.Hurt(projectile.damage);
-                InterruptWorkerAt(projectile.target);
+                EnemyHitActor(projectile.owner, projectile.target, projectile.damage);
                 Destroy(projectile.gameObject);
                 projectiles.RemoveAt(i);
             }
@@ -522,14 +573,18 @@ namespace AlienAllIn
             {
                 RippleRuntime ripple = sealRipples[i];
                 float previous = ripple.radius;
-                ripple.radius = Mathf.Min(Mathf.Max(board.width, board.height) * board.cellSize, previous + sealRippleSpeed * dt);
+                ripple.radius = Mathf.Min(3 * board.cellSize, previous + sealRippleSpeed * dt);
+                board.TryWorldToCell(ripple.origin, out var originCell);
                 foreach (GridActor enemy in enemies)
                 {
                     if (!enemy || !enemy.Alive || ripple.hit.Contains(enemy)) continue;
-                    float distance = Vector3.Distance(ripple.origin, enemy.transform.position);
+                    enemy.RefreshCell();
+                    if (!SealGridRange.Contains(enemy.CurrentCell - originCell, true)) continue;
+                    Vector2Int offset = enemy.CurrentCell - originCell;
+                    float distance = Mathf.Max(Mathf.Abs(offset.x), Mathf.Abs(offset.y)) * board.cellSize;
                     if (distance > ripple.radius || distance < previous) continue;
                     ripple.hit.Add(enemy);
-                    float maximumRadius = Mathf.Max(board.width, board.height) * board.cellSize;
+                    float maximumRadius = 3 * board.cellSize;
                     float falloff = Mathf.Lerp(1f, .25f, Mathf.Clamp01(distance / Mathf.Max(.1f, maximumRadius)));
                     float dealt = enemy.Hurt(seal.EffectiveDamage * sealRippleDamageMultiplier * falloff);
                     RegisterEnemyHit(seal, enemy, dealt, true);
@@ -538,7 +593,7 @@ namespace AlienAllIn
                     if (board.TryWorldToCell(destination, out _)) enemy.transform.position = destination;
                     InterruptWorkerAt(enemy);
                 }
-                if (ripple.radius >= Mathf.Max(board.width, board.height) * board.cellSize) sealRipples.RemoveAt(i);
+                if (ripple.radius >= 3 * board.cellSize) sealRipples.RemoveAt(i);
             }
         }
 
@@ -563,6 +618,7 @@ namespace AlienAllIn
                     nearest = Mathf.Min(nearest, Mathf.Min(difference, Mathf.Abs(difference - 180f)));
                 }
                 if (offset.magnitude > catLaserReach || nearest > catLaserArcDegrees * .5f) continue;
+                if (attackVfx) attackVfx.CatLaser(cat.transform.position, enemy.transform.position);
                 float dealt = enemy.Hurt(catLaserDamage + cat.EffectiveDamage * .25f);
                 RegisterEnemyHit(cat, enemy, dealt, true);
                 InterruptWorkerAt(enemy);
@@ -578,13 +634,12 @@ namespace AlienAllIn
             if (actor.kind == ActorKind.Seal)
             {
                 sealRipples.Add(new RippleRuntime { origin = seal.transform.position });
-                seal.ShowAttack(Mathf.Max(board.width, board.height) * board.cellSize);
+                if (attackVfx) attackVfx.SealGrid(seal.transform.position, true, .65f);
             }
             else if (actor.kind == ActorKind.Cat) catLaserClock = 0f;
             else if (actor.kind == ActorKind.Pufferfish)
             {
-                pufferDirection = Random.insideUnitCircle.normalized;
-                if (pufferDirection.sqrMagnitude < .1f) pufferDirection = Vector2.right;
+                ResetPufferCycle();
             }
             statusMessage = $"{actor.kind} Ultimate activated.";
             RunDataChanged?.Invoke();
@@ -623,11 +678,12 @@ namespace AlienAllIn
             {
                 awardedKills.Add(enemy);
                 bool ultimate = pendingKillIsUltimate.TryGetValue(enemy, out bool byUltimate) && byUltimate;
+                chips += Random.Range(1, 11);
                 AwardKill(null, ultimate, false);
             }
+            if (enemy == duckCaptor) ReleaseDuck();
             enemyRuntime.Remove(enemy);
             pendingKillIsUltimate.Remove(enemy);
-            pufferHitClocks.Remove(enemy);
         }
 
         void AwardKill(GridActor killer, bool byUltimate, bool ignored)
@@ -649,6 +705,7 @@ namespace AlienAllIn
                 if (projectile.gameObject) { if (Application.isPlaying) Destroy(projectile.gameObject); else DestroyImmediate(projectile.gameObject); }
             projectiles.Clear();
             sealRipples.Clear();
+            if (attackVfx) attackVfx.Clear();
         }
 
         public void RegisterCrushKill(GridActor enemy)

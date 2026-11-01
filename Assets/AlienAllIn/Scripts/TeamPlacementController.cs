@@ -44,7 +44,7 @@ namespace AlienAllIn
             Vector2 screenPosition = mouse.position.ReadValue();
             if (IsPointerOverBlockingUI(screenPosition)) return;
             Vector2 guiPosition = new Vector2(screenPosition.x, Screen.height - screenPosition.y);
-            if (PanelRect.Contains(guiPosition) || !stageCamera.pixelRect.Contains(screenPosition)) return;
+            if ((showLegacyPanel && PanelRect.Contains(guiPosition)) || !stageCamera.pixelRect.Contains(screenPosition)) return;
 
             Vector3 worldPosition = stageCamera.ScreenToWorldPoint(new Vector3(
                 screenPosition.x,

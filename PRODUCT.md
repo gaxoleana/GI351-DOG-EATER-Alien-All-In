@@ -17,7 +17,7 @@ Players who want a playful strategy and defense game with automated alien behavi
 
 ## Product Purpose
 
-Alien All In is a grid-based idle strategy defense game. Players arrange a team of aliens, start the run, and support their autonomous attacks and activities while enemies interfere. In the current Main prototype, a run ends when its timer expires or all active team members are eliminated; completing a Process station is a reward and does not end the run early.
+Alien All In is a grid-based idle strategy defense game. Players arrange a team of aliens, start the run, and support their autonomous attacks and activities while enemies interfere. In the current Main prototype, a run ends when time expires, all three fighters are eliminated, or Duck's rescue deadline expires; completing a Process station is a reward and does not end the run early.
 
 ## Positioning
 
@@ -26,14 +26,27 @@ The game combines automated alien behavior with tactical placement, activity pro
 ## Operating Context
 
 `Assets/Scenes/Main.unity` is the first enabled Build Settings scene and contains
-Stage 1: a 10x10 `BoardGrid`, one world unit per cell, and a 5x5 opening area.
+one continuous arcade session: a 10x10 maximum `BoardGrid`, one world unit per
+cell, and a visible 5x5 opening board that expands to 7x7 and 10x10 during play.
 `RunLoopController` provides Placement, Running, Paused, RunComplete and
-Defeated states, a prototype timer, and reset hooks. Its Seal, Cat, Pufferfish
-and Duck are all active run members. `TeamPlacementController` supports
+Defeated states, a prototype timer, and reset hooks. Seal, Cat and Pufferfish
+are the three combat members; Duck is an invulnerable station worker with a
+rescue deadline. `TeamPlacementController` supports
 Placement; `MainRunGameplaySystems` uses the same RunLoop clock for Process,
 Duck automation, the three fighter combat roles and Ultimate actions, three
-Enemy archetypes, field Items, Cash, Chips, upgrades and Score. GDD gaps and
+Enemy archetypes, field Items, Coins, shared Chips, ATK upgrades and Score. GDD gaps and
 temporary prototype values are documented in `GAMEPLAY.md`.
+
+The confirmed core session lasts five minutes. Stations start empty and roll a
+25% spawn chance every 60 seconds. Static pixel-art prefabs distinguish Casino,
+Darts and Jump Rope, and the melee Roaster, ranged Toaster and Pan Shield enemies.
+The session ends with a final score and Play Again. Main saves all HUD and attack
+VFX objects in its scene. Clicking a character opens a paused upgrade popup with
+a small camera zoom. Fighter upgrades add 0.1 ATK and double their Coin price
+per rank. Defeated enemies award 1-10 shared Chips. Duck has no HP/ATK and can be
+kidnapped; Chips pay its rescue ransom before the countdown expires. Seal uses
+the reference grid-cell attack masks, Cat a direct laser, and Pufferfish locks, launches, bounces twice,
+then stops and repeats.
 
 `Assets/Scenes/Gameplay.unity` remains the playable duck + seal reference with
 fixed casino and jump-rope activities, enemies, supplies, Switch relocation,
@@ -44,8 +57,8 @@ and prototype scope.
 
 - The GDD names three combat aliens: seal, pufferfish, and cat. A duck supports objectives and collects items.
 - The intended loop is setup, start, autonomous activities and combat, player intervention, resource use, and a timer or team-elimination outcome.
-- The named objectives are casino for duck, darts for pufferfish, and jump rope for seal. The GDD says a stage chooses two of four activities, but names only three; the fourth is undecided.
-- The GDD's first page says 3x3 while later detail pages and the UI say 10x10. The user confirmed 10x10 for this prototype; the final game's board size remains open.
+- Casino and Jump Rope belong to Seal; Darts belongs to Pufferfish. Duck can work all three. Cat defends. The fourth activity is undecided.
+- The confirmed prototype opens at 5x5 and expands to 7x7, then 10x10 in one continuous session. Future final sizes and balance remain adjustable.
 - Enemy HP is stated as 10. Alien HP, attack cadence, damage, objective duration, enemy pathing, charge rates, shop timing/prices, upgrade and Chip effects, interruption rules, and score tick details are not specified and must be labeled as prototype assumptions.
 - The gambling theme is present, but a betting mechanic is not yet specified.
 - The final game platform, full market/chip rules, and which items are included in the first build are undecided.

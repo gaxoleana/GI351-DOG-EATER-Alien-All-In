@@ -70,7 +70,6 @@ namespace AlienAllIn
         [SerializeField, Min(.1f)] float pufferFloatSpeed = 3f;
         [SerializeField, Min(0f)] float pufferCollisionRadius = .34f;
         [SerializeField, Min(0f)] float pufferDamageMultiplier = .5f;
-        [SerializeField, Min(.05f)] float pufferRepeatHitSeconds = .5f;
         [SerializeField, Min(1f)] float pufferUltimateSpeedMultiplier = 1.6f;
         [SerializeField, Min(1f)] float pufferUltimateDamageMultiplier = 2f;
 
@@ -92,28 +91,13 @@ namespace AlienAllIn
         [SerializeField, Min(0)] int pointsPerUltimateKill = 100;
         [SerializeField] bool ultimateKillAlsoScoresNormalKill;
 
-        [Header("Prototype Cash upgrades")]
-        [SerializeField, Min(0)] int damageUpgradeBaseCost = 5;
-        [SerializeField, Min(0)] int damageUpgradeCostStep = 5;
-        [SerializeField, Min(0f)] float damageUpgradeAmount = 1f;
-        [SerializeField, Min(0)] int castSpeedUpgradeBaseCost = 7;
-        [SerializeField, Min(0)] int castSpeedUpgradeCostStep = 5;
-        [SerializeField, Min(1f)] float castSpeedUpgradeMultiplier = 1.1f;
-        [SerializeField, Min(0)] int healthUpgradeBaseCost = 10;
-        [SerializeField, Min(0)] int healthUpgradeCostStep = 6;
-        [SerializeField, Min(0f)] float healthUpgradeAmount = 10f;
-        [SerializeField, Min(1)] int maxUpgradeRank = 5;
-
-        [Header("Prototype Chip Shop")]
-        [SerializeField] int sealChipPrice = 25;
-        [SerializeField] int catChipPrice = 30;
-        [SerializeField] int pufferfishChipPrice = 25;
-        [SerializeField, Min(0)] int chipDamageBonus = 2;
-        [SerializeField, Min(1)] int chipStockCapacity = 10;
-        [SerializeField, Min(.1f)] float shopRestockSeconds = 90f;
+        [Header("Coin ATK upgrades (cost doubles per fighter)")]
+        [SerializeField, Min(1)] int damageUpgradeBaseCost = 10;
+        [SerializeField, Min(.01f)] float damageUpgradeAmount = .1f;
 
         [Header("Live run data")]
-        [SerializeField] int cash;
+        [UnityEngine.Serialization.FormerlySerializedAs("cash")]
+        [SerializeField] int coins;
         [SerializeField] int score;
         [SerializeField] int processedStations;
         [SerializeField] string statusMessage = "No Process station yet.";
@@ -133,11 +117,11 @@ namespace AlienAllIn
         public GridActor Seal => seal;
         public GridActor Cat => cat;
         public GridActor Pufferfish => pufferfish;
-        public int Cash => cash;
+        public int Cash => coins;
+        public int Coins => coins;
         public int Score => score;
         public int ProcessedStations => processedStations;
         public string StatusMessage => statusMessage;
-        public bool ShopOpen { get; private set; }
         public IReadOnlyList<GridActor> Enemies => enemies;
         public IReadOnlyList<ActivityStation> Stations => stations;
         public IReadOnlyList<FieldPickup> FieldItems => fieldItems;
@@ -163,7 +147,6 @@ namespace AlienAllIn
 
         void HandleRunEnded(RunState result)
         {
-            ShopOpen = false;
             statusMessage = result == RunState.RunComplete ? "Run complete." : "Team defeated.";
             RunDataChanged?.Invoke();
         }
@@ -191,7 +174,8 @@ namespace AlienAllIn
             if (dt <= 0f) return;
 
             AdvanceTeamRuntime(dt);
-            AdvanceEconomy(dt);
+            AdvanceOrdersAndRescue(dt);
+            if (runLoop.State != RunState.Running) return;
             RefreshBoardOccupancy();
             AdvanceProcessSpawn(dt);
             AdvanceItemSpawn(dt);
@@ -211,15 +195,20 @@ namespace AlienAllIn
 
         void ResetForNewRun()
         {
+            DebugStopEnemySpawns = DebugStopStationSpawns = false;
             ClearSpawned(stations);
             ClearSpawned(fieldItems);
-            cash = score = processedStations = 0;
+            coins = score = processedStations = 0;
             processSpawnClock = 0f;
             itemSpawnClock = Mathf.Max(.1f, firstItemSpawnDelaySeconds);
-            ShopOpen = false;
             statusMessage = "Run ready. Start with empty inventories.";
             ResetEconomyForNewRun();
+            ResetOrdersAndRescue();
             ResetCombatForNewRun();
+            ReconcileDebugBoard();
+            // A formation captured on a larger debug board must remain restartable on 5x5.
+            foreach (GridActor actor in runLoop.Survivors)
+                if (actor && actor.Alive && actor.IsOnBoard) actor.CaptureStartingPosition();
             RunDataChanged?.Invoke();
         }
 
@@ -236,6 +225,7 @@ namespace AlienAllIn
 
         void AdvanceProcessSpawn(float dt)
         {
+            if (DebugStopStationSpawns) return;
             float interval = Mathf.Max(1f, processSpawnIntervalSeconds);
             processSpawnClock += dt;
             while (processSpawnClock >= interval)
@@ -248,7 +238,11 @@ namespace AlienAllIn
 
         bool TrySpawnActivity()
         {
-            ActivityPrototypeSettings settings = ChooseActivityPrototype();
+            return SpawnActivity(ChooseActivityPrototype());
+        }
+
+        bool SpawnActivity(ActivityPrototypeSettings settings)
+        {
             if (settings == null)
             {
                 statusMessage = "No configured Process activity.";
@@ -268,7 +262,7 @@ namespace AlienAllIn
                 RemoveEnemyByCrush(actor);
             }
 
-            ActivityStation station = Instantiate(casinoPrefab, board.CellCenter(selectedCell), Quaternion.identity, processContainer);
+            ActivityStation station = Instantiate(settings.prefab ? settings.prefab : casinoPrefab, board.CellCenter(selectedCell), Quaternion.identity, processContainer);
             station.name = $"{settings.kind.ToString().ToUpperInvariant()} {stations.Count + 1:00}";
             station.activityKind = settings.kind;
             station.activityName = ActivityLabel(settings.kind);
@@ -279,6 +273,7 @@ namespace AlienAllIn
             station.scoreTickSeconds = Mathf.Max(0f, settings.processScoreTickSeconds);
             station.allowUniversalDuckWorker = true;
             station.interruptionSeconds = Mathf.Max(0f, processInterruptionSeconds);
+            station.workColor = settings.markerColor;
             station.ResetActivity();
             if (station.marker) station.marker.color = settings.markerColor;
             stations.Add(station);
@@ -379,6 +374,7 @@ namespace AlienAllIn
         void TickDuck(float dt)
         {
             if (!duck || !duck.Alive) return;
+            if (DuckCaptured || manualDestinations.ContainsKey(duck)) return;
 
             if (duck.UltimateFull && !duck.IsUltimateActive)
             {
@@ -499,7 +495,7 @@ namespace AlienAllIn
             if (!station) return null;
             GridActor owner = GetActor(station.requiredKind);
             if (IsStandingAt(owner, station)) return owner;
-            if (station.allowUniversalDuckWorker && IsStandingAt(duck, station) && duck.State != ActorState.Panic)
+            if (!DuckCaptured && station.allowUniversalDuckWorker && IsStandingAt(duck, station) && duck.State != ActorState.Panic)
                 return duck;
             return null;
         }
@@ -531,7 +527,7 @@ namespace AlienAllIn
                 if (!worker) continue;
                 int scoreTicks;
                 int cashTicks = station.Advance(dt, worker, false, GetProcessingRate(worker), station.scoreTickSeconds, out scoreTicks);
-                if (cashTicks > 0) AddCash(cashTicks * Mathf.Max(0, cashPerTick), $"Cash +{cashTicks * cashPerTick}");
+                if (cashTicks > 0) AddCash(cashTicks * Mathf.Max(0, cashPerTick), $"Coins +{cashTicks * cashPerTick}");
                 if (scoreTicks > 0) AddScore(Mathf.RoundToInt(scoreTicks * Mathf.Max(0f, pointsPerProcessingTick)), "Processing");
                 if (worker == duck) duck.AddUltimateCharge(duckProcessChargePerSecond * dt);
                 if (!station.Complete) continue;

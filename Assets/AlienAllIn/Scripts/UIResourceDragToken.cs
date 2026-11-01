@@ -4,7 +4,7 @@ using UnityEngine.UI;
 
 namespace AlienAllIn
 {
-    public enum UIDragPayload { None, Actor, Item, Chip }
+    public enum UIDragPayload { None, Actor, Item }
 
     /// <summary>Small uGUI token that can be dropped on an Alien card or dragged onto the board.</summary>
     public sealed class UIResourceDragToken : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
@@ -12,7 +12,6 @@ namespace AlienAllIn
         [SerializeField] UIDragPayload payload;
         [SerializeField] GridActor actor;
         [SerializeField] FieldItemKind item;
-        [SerializeField] ActorKind chipOwner;
         RectTransform rect;
         Canvas rootCanvas;
         CanvasGroup canvasGroup;
@@ -21,7 +20,6 @@ namespace AlienAllIn
         public UIDragPayload Payload => payload;
         public GridActor Actor => actor;
         public FieldItemKind Item => item;
-        public ActorKind ChipOwner => chipOwner;
 
         void Awake()
         {
@@ -32,14 +30,13 @@ namespace AlienAllIn
 
         public void SetActor(GridActor value) { payload = UIDragPayload.Actor; actor = value; }
         public void SetItem(FieldItemKind value) { payload = UIDragPayload.Item; item = value; }
-        public void SetChip(ActorKind value) { payload = UIDragPayload.Chip; chipOwner = value; }
 
         public void SetLabel(string value, bool available)
         {
             Text text = GetComponentInChildren<Text>(true);
             if (text) text.text = value;
             Image image = GetComponent<Image>();
-            if (image) image.color = available ? new Color(.27f, .32f, .42f, 1f) : new Color(.14f, .16f, .19f, .85f);
+            if (image) image.color = available ? new Color(.78f, .78f, .78f, 1f) : new Color(.90f, .90f, .90f, 1f);
             if (canvasGroup) canvasGroup.interactable = available || payload == UIDragPayload.Actor;
         }
 

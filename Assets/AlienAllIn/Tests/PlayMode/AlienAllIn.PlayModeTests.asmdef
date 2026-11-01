@@ -1,5 +1,5 @@
 {
   "name": "AlienAllIn.PlayModeTests",
-  "references": ["AlienAllIn.Runtime", "UnityEngine.UI"],
+  "references": ["AlienAllIn.Runtime", "UnityEngine.UI", "Unity.InputSystem"],
   "optionalUnityReferences": ["TestAssemblies"]
 }

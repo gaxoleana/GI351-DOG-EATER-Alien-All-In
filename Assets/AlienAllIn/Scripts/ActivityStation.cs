@@ -18,6 +18,11 @@ namespace AlienAllIn
         [Min(0f), Tooltip("Prototype pause applied after an Enemy hits this station or its current worker.")]
         public float interruptionSeconds = 2f;
         public SpriteRenderer marker;
+        [Header("Optional station artwork")]
+        public SpriteRenderer artwork;
+        public Transform progressFill;
+        [Min(.01f)] public float progressBarWidth = .82f;
+        public Color workColor = new Color(.87f, .73f, .36f);
         [SerializeField] float progress;
         float rewardClock;
         float scoreClock;
@@ -39,6 +44,7 @@ namespace AlienAllIn
         public void Interrupt()
         {
             interruptionRemaining = Mathf.Max(interruptionRemaining, Mathf.Max(0f, interruptionSeconds));
+            RefreshView();
         }
 
         public int Advance(float dt, GridActor worker, bool threatened) =>
@@ -54,6 +60,7 @@ namespace AlienAllIn
             if (interruptionRemaining > 0f)
             {
                 interruptionRemaining = Mathf.Max(0f, interruptionRemaining - dt);
+                RefreshView();
                 return 0;
             }
             bool correctWorker = worker && (worker.kind == requiredKind ||
@@ -94,7 +101,14 @@ namespace AlienAllIn
 
         public void RefreshView()
         {
-            if (marker) marker.color = Complete ? new Color(.25f, 1, .65f) : new Color(.87f, .73f, .36f);
+            if (marker) marker.color = Complete ? new Color(.25f, 1, .65f) : workColor;
+            if (artwork) artwork.color = IsInterrupted ? new Color(1, .65f, .65f) : Color.white;
+            if (progressFill)
+            {
+                float fill = Mathf.Clamp01(progress);
+                progressFill.localScale = new Vector3(progressBarWidth * fill, .055f, 1);
+                progressFill.localPosition = new Vector3(-progressBarWidth * (1 - fill) * .5f, -.46f, 0);
+            }
         }
     }
 }

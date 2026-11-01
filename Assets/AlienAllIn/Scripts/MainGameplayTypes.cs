@@ -5,13 +5,15 @@ namespace AlienAllIn
 {
     public enum ActivityKind { Casino, Darts, JumpRope }
     public enum EnemyArchetype { RoasterMelee, ToasterRanged, PanShield }
-    public enum UpgradeKind { Damage, CastSpeed, Health }
+    public enum PufferAttackPhase { Stationary, Locked, Launched, Bouncing }
 
     [Serializable]
     public sealed class ActivityPrototypeSettings
     {
         public ActivityKind kind;
         public ActorKind owner;
+        [Tooltip("Optional visual prefab for this activity. Uses the legacy prototype when empty.")]
+        public ActivityStation prefab;
         [Min(1f)] public float durationSeconds = 36f;
         [Min(.05f)] public float cashTickSeconds = 1f;
         [Min(0f)] public float processScoreTickSeconds = 2f;
@@ -22,6 +24,8 @@ namespace AlienAllIn
     public sealed class EnemyPrototypeSettings
     {
         public EnemyArchetype archetype;
+        [Tooltip("Optional visual prefab for this enemy archetype.")]
+        public GridActor prefab;
         [Min(0f)] public float spawnWeight = 1f;
         [Min(1f)] public float health = 10f;
         [Min(.01f)] public float moveSpeed = .8f;

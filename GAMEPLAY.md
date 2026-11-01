@@ -1,133 +1,91 @@
 # Play the Unity core gameplay scene
 
-## Stage 1 entry scene
+## Main arcade session
 
-`Assets/Scenes/Main.unity` is the first enabled Build Settings scene. It contains
-the Stage 1 board shell: a 10x10 `BoardGrid`, with a 5x5 area open at 0% run
-progress and locked cells visible in a darker color. `RunLoopController` starts
-and pauses the run; `MainCoreGameplayUI` displays the timer/status and restarts the stage. It
-is connected to the four-member Seal, Cat, Pufferfish, and Duck roster. The
-team is editable in the RunLoop Inspector and appears under `Stage 1/Team`.
-All four are active run members in Main; Cat/Pufferfish receive combat behavior
-and Duck participates in team defeat checks.
+Open `Assets/Scenes/Main.unity` in Unity **6000.5.10f1** and press Play. Main is
+the first build scene. One session lasts five minutes: a 5x5 opening board grows
+to 7x7 after 150 seconds and 10x10 after 225 seconds. Each cell is one world unit.
+Stations start empty; every 60 seconds a 25% roll may create Casino, Darts or
+Jump Rope. Stations and enemies use distinct pixel-art prefabs.
 
-`StageGridProgression` is the single Main-scene source for the prototype run
-duration (300 seconds) and grid milestones. The GDD leaves the final duration
-and expansion milestones open. The opening area is 5x5. Existing prototype
-thresholds hold that area through 25%, open 7x7 at 50%, and the full 10x10 board
-at 75%. The run loop reads progress from its one
-elapsed-time clock. It exposes optional authored player start cells and the
-currently open cells as potential Process spawn candidates.
-The Stage start cells and RunLoop survivor roster contain the same four unique
-open cells/members. The `TeamPlacementController` uses `BoardGrid` occupancy and
-does not add colliders to each tile. During Placement, select a member card (or
-press 1-4), then click an empty open cell to move it. Locked,
-outside, and teammate-occupied cells are rejected. Space only starts once all
-members are alive, inside the open grid, and in distinct cells.
-`RegisterSurvivor` is deduplicated and Restart keeps the existing roster instead
-of registering it again. Process completion is not a run-end condition.
+All HUD objects are **saved in Main**, including the header, roster, Items,
+station status, character popup, result screen and O-key tools. Runtime code
+binds the references and updates values; it creates no HUD objects. Edit the
+`Main Core Gameplay UI` Canvas under the UI controller. Enable its inactive
+`Character Popup` child to preview and edit it before Play; startup hides it.
+The inactive `Debug Tools (O)` Canvas is saved beside it. `Attack VFX` under the
+gameplay systems contains the Cat laser. `Board Feedback` contains editable hover
+and drag outlines plus the Seal tile highlight colors. Text, colors,
+widths, anchors and layouts are normal Inspector properties. MainSceneLayout
+on Main Camera controls reserved HUD regions and selection zoom (.88 default).
 
-The shared `GridActor` stores species, health/alive state, current grid cell, and
-the run-start position. Restart restores the saved formation and calls
-`ResetActor`, which returns each Animator to Idle. Each species has Idle, Attack,
-and Ultimate clips at 8 FPS. Idle loops; Attack and Ultimate return to Idle after
-one play. Duck's Attack clip is retained on its animation driver as a supplemental
-asset, but the Duck controller has no Attack state and `PlayAttack` rejects Duck.
-Processing currently remains on Idle until a Process animation is specified.
-The sprite sheets use Point filtering, 362 PPU (one 362-pixel frame per one-unit
-cell), no mipmaps, and uncompressed textures. The source files currently live
-under `Assets/AlienAllIn/Art/Sprites/` in this project.
+- **Space** starts and pauses/resumes. **R** restarts. Header buttons offer Start,
+  Pause and Options; Options contains Resume and Restart.
+- Click a character on the board to open its popup. Play pauses and
+  the camera zooms in slightly. **X**, outside click or **Escape** closes it.
+  Closing resumes only if opening the popup caused the pause.
+- Drag a character on the board onto an open cell or matching
+  station. Placement snaps; during play it walks there without spending charge.
+  Seal works Casino/Jump Rope, Pufferfish works Darts, Duck works any station,
+  and Cat defends. Occupied/outside/incompatible cells are rejected.
 
-Space starts from Placement and pauses/resumes while running; R restarts. Pause
-and terminal states set Unity's scaled game time to zero. Restart restores the
-saved starting positions, HP/state/Idle animation and any optional activities or
-pickups wired to the controller, then returns the grid to its opening area. The
-final-frame tie rule checks team elimination before timeout, matching the
-existing Gameplay prototype's outcome order. Main's shared GridActor HP is 30
-per member as a prototype value; the GDD does not set Alien HP.
+## Coins, Chips and ATK upgrades
 
-## Main vertical slice
+Working at stations pays Coins (+1 per prototype work tick). A fighter's popup
+has one Upgrade button: **+0.1 ATK**, initially **10 Coins**, then **20, 40, 80...**
+independently for each fighter. HP and attack cadence do not change. Edit the
+initial price and increment on MainRunGameplaySystems. Duck has no upgrade,
+HP or ATK display. Defeated enemies award **1-10 shared Chips**, immediately
+collected once per enemy. Coins/Chips are separate from Score. The species Chip
+inventories and Chip Shop have been removed. Items and Ultimate gauges remain.
 
-`MainRunGameplaySystems` extends the existing Stage and Run Loop. The Run Loop
-is the only owner of run time and outcomes; gameplay systems advance only with
-`GameplayDeltaTime`. Pause freezes movement, spawn clocks, projectiles, attacks,
-charge, Process, Cash, Score and shop restock. Restart removes runtime stations,
-pickups, enemies and projectiles, clears inventories/Cash/Score, resets shop
-stock, restores the four saved positions, HP/upgrades and Idle animations, then
-returns Stage progression to its starting area. RunComplete comes only from the
-timer. Defeated checks all four active members, including Duck. If the last
-member dies on the timeout frame, Defeated wins because the existing Run Loop
-resolves a team wipe before its timed result.
+## Duck rescue
 
-Main starts in Placement with all four members on distinct cells in the open
-5x5 area. Select a card and click an open cell to arrange the roster. During a
-run, fighter cards can be dragged to an open cell only with a full personal
-Ultimate gauge; the move consumes that gauge. Duck may be dragged only while
-Panic, Hiding, Working, or recently hit. A Duck drop next to an Alien and behind
-it relative to the nearest threat marks it Hiding; this geometric reading of
-“behind” is a prototype rule. Space starts/pauses/resumes; R restarts.
+Duck cannot take HP damage. An enemy reaching and hitting it captures it instead.
+Its popup shows **Free the Duck**, a **5-Chip** ransom and a **15-second** active
+play deadline. Paying or killing its captor frees Duck; expiration ends the
+session. A three-second grace period prevents immediate recapture. These values
+are editable on MainRunGameplaySystems. Captured Duck cannot be moved. The
+popup pauses the rescue clock with gameplay. Losing all three fighters also
+ends the session; Duck is excluded from the fighter HP defeat count. Restart
+clears rescue state, Coins, Chips, upgrades, spawned objects and debug overrides.
 
-The field starts with no Process station and no carried Items. Every 60 run
-seconds, the Inspector-defined 25% roll may create Casino, Darts, or Jump Rope
-in a currently open valid cell. The three activities are selected uniformly at
-random as a temporary rule; the GDD names no fourth activity and does not define
-selection. A station cannot overlap an Alien, Item or another station. An
-Enemy on its cell is crushed. If no valid cell exists, the roll is skipped until
-the next interval, a temporary choice because the GDD leaves this case open.
-There is no separate station-count cap beyond available cells.
+## Attacks
 
-The existing `ActivityStation` handles Process. Prototype durations are Casino
-36s, Darts 32s and Jump Rope 40s at owner rate. Duck can work any station at
-1.10x rate and receives another +15% while Overdrive is active. Each 1 second of
-active work pays +1 Cash; every 2 seconds adds +5 Score; completion adds +100
-Score, increments Processed once and removes the station. These tick timings are
-prototype values. Enemy hits preserve progress and pause work for 2 seconds.
-Stations have no HP. The GDD has not set these interruption and tick rules.
+Seal highlights its affected grid cells before the slam (.16-second telegraph).
+Normal range follows the reference rows 1/3/5/3/1 (13 cells including center);
+enhanced range follows 3/5/5/5/3 (21 cells). Cells beyond the active board are
+clipped. Damage uses the same cell masks, including enemies moving within a cell. Cat draws a brief straight laser to its hit target.
+Seal uses tile highlights; Cat uses a saved LineRenderer. Both freeze while paused. Pufferfish adds no VFX:
+**stationary -> lock one target -> launch -> bounce 1 -> bounce 2 -> stop ->
+wait -> lock again**. It retains the selected enemy during locking and launches
+toward it. Enemy, ally, station and wall collisions count; sustained contact
+with one object is not counted repeatedly. The second bounce stops movement.
+If its locked target dies before launch, it waits and relocks.
 
-Duck prioritizes field Items over available Process and enters Panic while an
-Enemy targets it. It automatically walks to Items and stations; the player can
-drag it behind a teammate to hide. Items spawn after 8 seconds and every 28
-seconds, with a four-item field cap; these are adjustable prototype values.
-Duck's gauge gains +0.15 per pickup, +0.025 per second while processing and
-+0.04 per second in Panic. A full gauge automatically starts a 7-second
-Overdrive with 1.35x movement speed. During Overdrive, Duck ignores Panic and
-continues Process through hits while still taking damage. Duck has no Attack
-gameplay and its Attack clip is never called.
+## O-key debug tools
 
-Seal performs AOE normal attacks with knockback; Cat hits one Enemy and stuns
-it; Pufferfish inflates, floats randomly, bounces from the board, Enemies and
-stations and teammates, and deals reduced contact damage with a repeat-hit cooldown.
-Pufferfish can be picked up only while floating and with a full Ultimate gauge.
-Fighter gauges charge from damage dealt; one full gauge is 30 damage. Matching Items
-require a full gauge, consume both Item and gauge, then activate that fighter's
-Ultimate. Seal's expanding ripple loses damage with distance; Cat emits eight
-rotating laser spokes; Pufferfish's Ultimate increases float speed and contact
-damage. Ultimate Switch requires two full fighter gauges, swaps their positions
-and activates both Ultimates. Timing, range, cadence and damage are Inspector
-prototypes.
+**O** opens/closes the saved debug Canvas in Editor/Development Builds; Escape
+and Close also close it. It works in Placement and Pause and blocks board input
+underneath. Scroll for all controls: spawn specific/random enemies or stations;
+spawn five; kill for rewards or clear without rewards; expand/reduce or set
+5x5/7x7/10x10/Auto; add/remove time; grant Coins/Chips/Items/Score; heal/revive;
+fill Ultimates; freeze the clock; disable automatic enemy/station spawning.
 
-The shared Enemy prefab is configured at runtime as one of three archetypes,
-each with 10 HP. Roaster (melee) approaches the team, retreats from its nearest
-threat at 20% HP or less, then takes a prototype 0.75s bite to restore +5 HP once.
-Toaster (ranged) keeps distance from fighters except Duck and fires target-following
-projectiles. Pan advances more slowly, reduces incoming damage by 20%, and uses a
-short-range fry AOE that also interrupts nearby Process stations. Prototype spawn
-settings are 7s initial delay, 4.5s interval and eight live Enemies; per-type
-weights, speed, range, damage and cooldown are editable. Pan's always-on damage
-reduction, Toaster's preferred range, and Roaster's eat/retreat timing are
-temporary interpretations of the GDD.
+Shrinking keeps allies in distinct active cells and removes off-board objects.
+Clear/off-board removal grants no kill Score or Chips. Timer edits change time
+remaining without skipping elapsed gameplay or spawn clocks. Restart resets
+overrides. To expose O in a release build, enable `Enable Debug In Release Build`
+on MainCoreGameplayUI.
 
-Cash and Score are separate. Cash upgrades Damage, cast speed and HP. The Chip
-Shop sells Seal, Cat and Pufferfish Chips; bought Chips enter inventory and
-must be dragged onto the matching fighter. Upgrade/Chip prices and effects,
-stock capacity and 90s restock are prototype values. The basic UI shows time,
-run state, team HP/gauges, Process and Enemy HP, Item/Chip inventory, Cash and
-Score. GDD score values are Hit +10, Processing +5 per prototype tick, Processed
-+100, normal Kill +50 and Ultimate Kill +100. Ultimate Kill is exclusive to
-normal Kill in this prototype; the GDD leaves additive versus replacement open.
-No Kill Count is shown. The GDD's fourth Process type remains unspecified and
-is intentionally absent. Charge, drop, duration, economy and interruption
-details that the GDD leaves open remain Inspector prototypes for review.
+The timing, work rewards, ransom, combat and upgrade balance above are prototype
+tuning. These user-directed mechanics supersede the older HP-Duck, random-float
+Pufferfish and three-upgrade/Chip-Shop rules. The explicit Editor menu
+`Alien All In > Author Main scene HUD and attack visuals` rebuilds and saves the
+named HUD/VFX children. It is never invoked automatically by Play or import.
+Normal Inspector editing does not require rebuilding.
+
+## Legacy reference scene
 
 `Assets/Scenes/Gameplay.unity` remains the playable duck + seal reference scene
 described below; it was kept separate from the Stage 1 entry scene.
@@ -225,3 +183,15 @@ and then `-testPlatform PlayMode`, specifying `-testResults <path>` each time.
 `Alien All In > Rebuild Gameplay scene` is an optional authoring tool. It **replaces
 Gameplay.unity**, so save a copy before using it. It is never invoked on import
 or Play. Normal scene editing does not require rebuilding.
+
+
+## Reference HUD and pointer feedback
+
+The main HUD now follows the supplied reference: centered Score/Grid/Timer,
+Start/Pause/Options at the top right, a bottom item bar, station/enemy status on
+the right, and a blank reserved area on the left. The old roster cards are hidden.
+Coins and Chips remain visible under the central run information. Options offers
+Resume/Restart; keyboard O retains the debug tools. Hover a board character for
+an outline. Drag a character to see the destination cell highlighted green when
+valid and red when blocked; leaving the board or ending the drag clears it.
+Seal's Inspector gizmo also uses the normal grid-cell mask in Main.

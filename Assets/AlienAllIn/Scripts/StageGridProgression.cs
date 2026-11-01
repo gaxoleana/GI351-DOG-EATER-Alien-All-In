@@ -35,8 +35,11 @@ namespace AlienAllIn
         [SerializeField, Min(0f)] float cameraPadding = .35f;
 
         readonly List<Vector2Int> processSpawnCandidates = new List<Vector2Int>(100);
+        Vector2Int debugSize;
+        float lastProgress;
 
         public BoardGrid Board => board;
+        public bool HasDebugSize => debugSize.x > 0 && debugSize.y > 0;
         public float RunDurationSeconds => Mathf.Max(1f, runDurationSeconds);
         public IReadOnlyList<Vector2Int> PlayerStartCells => playerStartCells ?? Array.Empty<Vector2Int>();
         public IReadOnlyList<Vector2Int> ProcessSpawnCandidates
@@ -76,17 +79,31 @@ namespace AlienAllIn
             }
 
             float normalizedProgress = Mathf.Clamp01(progress);
+            lastProgress = normalizedProgress;
             bool fullGrid = normalizedProgress >= expandToFullAt;
             int size = normalizedProgress < expandToMiddleAt ? openingSize :
                 normalizedProgress < expandToLateAt ? middleSize : lateSize;
 
-            board.KeepLockedCellsVisible = true;
+            board.KeepLockedCellsVisible = false;
             board.SetActiveSize(
-                fullGrid ? board.width : Mathf.Min(size, board.width),
-                fullGrid ? board.height : Mathf.Min(size, board.height));
+                HasDebugSize ? debugSize.x : fullGrid ? board.width : Mathf.Min(size, board.width),
+                HasDebugSize ? debugSize.y : fullGrid ? board.height : Mathf.Min(size, board.height));
 
             RefreshProcessSpawnCandidates();
             FrameActiveArea();
+        }
+
+        public void SetDebugSize(int width, int height)
+        {
+            if (!board) return;
+            debugSize = new Vector2Int(Mathf.Clamp(width, 1, board.width), Mathf.Clamp(height, 1, board.height));
+            ApplyRunProgress(lastProgress);
+        }
+
+        public void ClearDebugSize()
+        {
+            debugSize = Vector2Int.zero;
+            if (board) ApplyRunProgress(lastProgress);
         }
 
         public bool TryGetPlayerStartPosition(int index, out Vector3 worldPosition)
@@ -118,6 +135,10 @@ namespace AlienAllIn
         void FrameActiveArea()
         {
             if (!stageCamera) return;
+
+            // Main reserves space for the HUD and frames future expansion cells as well.
+            MainSceneLayout layout = stageCamera.GetComponent<MainSceneLayout>();
+            if (layout) { layout.RefreshCamera(); return; }
 
             stageCamera.orthographic = true;
             Vector3 center = board.ActiveCenter;

@@ -39,12 +39,16 @@ namespace AlienAllIn
         float timeScaleBeforeFreeze = 1f;
         bool ownsTimeFreeze;
         bool outcomeResolutionQueued;
+        float debugTimerAdjustmentSeconds;
+        public bool DebugFreezeTimer { get; set; }
+        public bool InteractionModalOpen { get; set; }
         string placementMessage = string.Empty;
 
         public RunState State => state;
         public float ElapsedSeconds => elapsedSeconds;
         public float RunDurationSeconds => stage ? stage.RunDurationSeconds : 0f;
-        public float TimeRemainingSeconds => Mathf.Max(0f, RunDurationSeconds - elapsedSeconds);
+        public float EffectiveDurationSeconds => Mathf.Max(0f, RunDurationSeconds + debugTimerAdjustmentSeconds);
+        public float TimeRemainingSeconds => Mathf.Max(0f, EffectiveDurationSeconds - elapsedSeconds);
         public float Progress => RunDurationSeconds > 0f ? Mathf.Clamp01(elapsedSeconds / RunDurationSeconds) : 0f;
         public int LivingAlienCount
         {
@@ -100,7 +104,7 @@ namespace AlienAllIn
                     return;
                 }
 
-                if (keyboard.spaceKey.wasPressedThisFrame)
+                if (!InteractionModalOpen && keyboard.spaceKey.wasPressedThisFrame)
                 {
                     if (state == RunState.Placement) StartRun();
                     else if (state == RunState.Running) Pause();
@@ -110,7 +114,7 @@ namespace AlienAllIn
 
             if (state != RunState.Running || !stage) return;
 
-            elapsedSeconds = Mathf.Min(RunDurationSeconds, elapsedSeconds + Time.deltaTime);
+            if (!DebugFreezeTimer) elapsedSeconds = Mathf.Min(EffectiveDurationSeconds, elapsedSeconds + Time.deltaTime);
             ApplyStageProgress();
         }
 
@@ -126,7 +130,7 @@ namespace AlienAllIn
                 return;
             }
 
-            if (elapsedSeconds >= RunDurationSeconds && !outcomeResolutionQueued)
+            if (TimeRemainingSeconds <= 0f && !outcomeResolutionQueued)
                 StartCoroutine(ResolveTimedOutcomeAtFrameEnd());
         }
 
@@ -135,7 +139,7 @@ namespace AlienAllIn
             outcomeResolutionQueued = true;
             yield return new WaitForEndOfFrame();
             outcomeResolutionQueued = false;
-            if (state != RunState.Running) yield break;
+            if (state != RunState.Running || TimeRemainingSeconds > 0f) yield break;
 
             // The final survivor may be eliminated by another gameplay system later this frame.
             Finish(RegisteredAlienCount > 0 && LivingAlienCount == 0
@@ -145,7 +149,7 @@ namespace AlienAllIn
 
         public void StartRun()
         {
-            if (state != RunState.Placement || !stage) return;
+            if (InteractionModalOpen || state != RunState.Placement || !stage) return;
 
             if (!TryValidateFormation(out placementMessage)) return;
 
@@ -206,14 +210,18 @@ namespace AlienAllIn
 
         public void Resume()
         {
-            if (state != RunState.Paused) return;
+            if (state != RunState.Paused || InteractionModalOpen) return;
             RestoreGameTime();
             state = RunState.Running;
         }
 
         public void Restart()
         {
+            InteractionModalOpen = false;
             RestoreGameTime();
+            DebugFreezeTimer = false;
+            debugTimerAdjustmentSeconds = 0f;
+            if (stage) stage.ClearDebugSize();
             elapsedSeconds = 0f;
             state = RunState.Placement;
             outcomeResolutionQueued = false;
@@ -221,6 +229,24 @@ namespace AlienAllIn
             ApplyStageProgress();
             ResetStageObjects();
             RunRestarted?.Invoke();
+        }
+
+        /// <summary>Changes remaining time without rewinding elapsed play, spawns, or board milestones.</summary>
+        public bool DebugSetRemainingTime(float seconds)
+        {
+            if (!stage || float.IsNaN(seconds) || float.IsInfinity(seconds) ||
+                state == RunState.RunComplete || state == RunState.Defeated) return false;
+            debugTimerAdjustmentSeconds = elapsedSeconds + Mathf.Max(0f, seconds) - RunDurationSeconds;
+            if (seconds <= 0f && (state == RunState.Running || state == RunState.Paused))
+                Finish(RegisteredAlienCount > 0 && LivingAlienCount == 0 ? RunState.Defeated : RunState.RunComplete);
+            return true;
+        }
+
+        public bool DebugAddTime(float seconds) => DebugSetRemainingTime(TimeRemainingSeconds + seconds);
+
+        public void ReportDefeat()
+        {
+            if (state == RunState.Running) Finish(RunState.Defeated);
         }
 
         /// <summary>
