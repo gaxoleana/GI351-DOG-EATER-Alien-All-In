@@ -1,15 +1,15 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
 namespace AlienAllIn
 {
     /// <summary>
-    /// Main-scene gameplay slice. RunLoopController remains the only owner of the
-    /// clock, pause state, and run outcome; this component advances combat, Process,
-    /// Cash, and spawning only from its GameplayDeltaTime.
+    /// Main-scene run simulation. RunLoopController remains the only owner of the
+    /// clock, pause state, stage progression, and run outcome.
     /// </summary>
     [DisallowMultipleComponent]
-    public sealed class MainRunGameplaySystems : MonoBehaviour
+    public sealed partial class MainRunGameplaySystems : MonoBehaviour
     {
         [Header("Run and stage references")]
         [SerializeField] RunLoopController runLoop;
@@ -17,67 +17,170 @@ namespace AlienAllIn
         [SerializeField] BoardGrid board;
         [SerializeField] GridActor duck;
         [SerializeField] GridActor seal;
+        [SerializeField] GridActor cat;
+        [SerializeField] GridActor pufferfish;
         [SerializeField] GridActor enemyPrefab;
         [SerializeField] ActivityStation casinoPrefab;
+        [SerializeField] Sprite itemSprite;
+        [SerializeField] Sprite projectileSprite;
         [SerializeField] Transform enemyContainer;
         [SerializeField] Transform processContainer;
+        [SerializeField] Transform pickupContainer;
 
         [Header("Prototype Process spawning")]
         [SerializeField, Min(1f)] float processSpawnIntervalSeconds = 60f;
         [SerializeField, Range(0f, 1f)] float processSpawnChance = .25f;
-        [SerializeField, Min(1f)] float casinoDurationSeconds = 36f;
-        [SerializeField, Min(.05f)] float cashTickSeconds = 1f;
+        [SerializeField] ActivityPrototypeSettings[] activitySettings =
+        {
+            new ActivityPrototypeSettings { kind = ActivityKind.Casino, owner = ActorKind.Seal, durationSeconds = 36f, cashTickSeconds = 1f, processScoreTickSeconds = 2f, markerColor = new Color(.92f, .67f, .28f, 1f) },
+            new ActivityPrototypeSettings { kind = ActivityKind.Darts, owner = ActorKind.Pufferfish, durationSeconds = 32f, cashTickSeconds = 1f, processScoreTickSeconds = 2f, markerColor = new Color(.45f, .78f, .98f, 1f) },
+            new ActivityPrototypeSettings { kind = ActivityKind.JumpRope, owner = ActorKind.Seal, durationSeconds = 40f, cashTickSeconds = 1f, processScoreTickSeconds = 2f, markerColor = new Color(.63f, .93f, .64f, 1f) }
+        };
         [SerializeField, Range(1f, 2f)] float duckProcessingMultiplier = 1.1f;
+        [SerializeField, Range(0f, 1f)] float duckUltimateProcessBonus = .15f;
         [SerializeField, Min(0f)] float processInterruptionSeconds = 2f;
+        [SerializeField] int cashPerTick = 1;
+        [SerializeField, Min(0f)] float pointsPerProcessingTick = 5f;
+
+        [Header("Prototype Duck behaviour")]
+        [SerializeField, Min(0f)] float duckPanicChargePerSecond = .04f;
+        [SerializeField, Min(0f)] float duckProcessChargePerSecond = .025f;
+        [SerializeField, Min(0f)] float duckItemCharge = .15f;
+        [SerializeField, Min(.1f)] float duckUltimateDurationSeconds = 7f;
+        [SerializeField, Min(1f)] float duckUltimateMoveMultiplier = 1.35f;
+
+        [Header("Prototype item drops")]
+        [SerializeField, Min(.1f)] float firstItemSpawnDelaySeconds = 8f;
+        [SerializeField, Min(.1f)] float itemSpawnIntervalSeconds = 28f;
+        [SerializeField, Min(1)] int maxFieldItems = 4;
+
+        [Header("Prototype combat tuning")]
+        [SerializeField, Min(0f)] float sealKnockbackDistance = .45f;
+        [SerializeField, Min(.1f)] float sealRippleSpeed = 5f;
+        [SerializeField, Min(0f)] float sealRippleDamageMultiplier = 2f;
+        [SerializeField, Min(0f)] float sealRippleKnockback = 1.4f;
+        [SerializeField, Min(0f)] float catStunSeconds = 1f;
+        [SerializeField, Min(.1f)] float catLaserDurationSeconds = 4f;
+        [SerializeField, Min(.1f)] float catLaserRevolutions = 2f;
+        [SerializeField, Min(.1f)] float catLaserHitIntervalSeconds = .5f;
+        [SerializeField, Min(0f)] float catLaserDamage = 1.5f;
+        [SerializeField, Range(1f, 180f)] float catLaserArcDegrees = 35f;
+        [SerializeField, Min(.1f)] float pufferInflateSeconds = .55f;
+        [SerializeField, Min(.1f)] float pufferFloatSeconds = 3.5f;
+        [SerializeField, Min(.1f)] float pufferFloatSpeed = 3f;
+        [SerializeField, Min(0f)] float pufferCollisionRadius = .34f;
+        [SerializeField, Min(0f)] float pufferDamageMultiplier = .5f;
+        [SerializeField, Min(.05f)] float pufferRepeatHitSeconds = .5f;
+        [SerializeField, Min(1f)] float pufferUltimateSpeedMultiplier = 1.6f;
+        [SerializeField, Min(1f)] float pufferUltimateDamageMultiplier = 2f;
 
         [Header("Prototype enemy spawning")]
         [SerializeField, Min(.1f)] float firstEnemyDelaySeconds = 7f;
         [SerializeField, Min(.1f)] float enemySpawnIntervalSeconds = 4.5f;
         [SerializeField, Min(1)] int maxEnemies = 8;
-        [SerializeField, Min(0f)] float sealKnockbackDistance = .45f;
+        [SerializeField] EnemyPrototypeSettings[] enemySettings =
+        {
+            new EnemyPrototypeSettings { archetype = EnemyArchetype.RoasterMelee, spawnWeight = 1f, health = 10f, moveSpeed = .8f, damage = 3f, attackRange = .65f, attackInterval = 1.2f, specialValue = 5f, projectileSpeed = 5f, shieldedDamageReduction = .2f, displayColor = new Color(1f, .72f, .55f) },
+            new EnemyPrototypeSettings { archetype = EnemyArchetype.ToasterRanged, spawnWeight = 1f, health = 10f, moveSpeed = .65f, damage = 2f, attackRange = 5f, attackInterval = 2.2f, specialValue = 3.1f, projectileSpeed = 5f, shieldedDamageReduction = .2f, displayColor = new Color(.79f, .72f, 1f) },
+            new EnemyPrototypeSettings { archetype = EnemyArchetype.PanShield, spawnWeight = 1f, health = 10f, moveSpeed = .45f, damage = 3f, attackRange = .8f, attackInterval = 2.6f, specialValue = 1.2f, projectileSpeed = 5f, shieldedDamageReduction = .2f, displayColor = new Color(.77f, .85f, .88f) }
+        };
 
-        [Header("Live run resources")]
+        [Header("Prototype Score values (GDD points)")]
+        [SerializeField, Min(0)] int pointsPerHit = 10;
+        [SerializeField, Min(0)] int pointsPerProcessed = 100;
+        [SerializeField, Min(0)] int pointsPerNormalKill = 50;
+        [SerializeField, Min(0)] int pointsPerUltimateKill = 100;
+        [SerializeField] bool ultimateKillAlsoScoresNormalKill;
+
+        [Header("Prototype Cash upgrades")]
+        [SerializeField, Min(0)] int damageUpgradeBaseCost = 5;
+        [SerializeField, Min(0)] int damageUpgradeCostStep = 5;
+        [SerializeField, Min(0f)] float damageUpgradeAmount = 1f;
+        [SerializeField, Min(0)] int castSpeedUpgradeBaseCost = 7;
+        [SerializeField, Min(0)] int castSpeedUpgradeCostStep = 5;
+        [SerializeField, Min(1f)] float castSpeedUpgradeMultiplier = 1.1f;
+        [SerializeField, Min(0)] int healthUpgradeBaseCost = 10;
+        [SerializeField, Min(0)] int healthUpgradeCostStep = 6;
+        [SerializeField, Min(0f)] float healthUpgradeAmount = 10f;
+        [SerializeField, Min(1)] int maxUpgradeRank = 5;
+
+        [Header("Prototype Chip Shop")]
+        [SerializeField] int sealChipPrice = 25;
+        [SerializeField] int catChipPrice = 30;
+        [SerializeField] int pufferfishChipPrice = 25;
+        [SerializeField, Min(0)] int chipDamageBonus = 2;
+        [SerializeField, Min(1)] int chipStockCapacity = 10;
+        [SerializeField, Min(.1f)] float shopRestockSeconds = 90f;
+
+        [Header("Live run data")]
         [SerializeField] int cash;
+        [SerializeField] int score;
         [SerializeField] int processedStations;
         [SerializeField] string statusMessage = "No Process station yet.";
 
         readonly List<GridActor> enemies = new List<GridActor>();
         readonly List<ActivityStation> stations = new List<ActivityStation>();
+        readonly List<FieldPickup> fieldItems = new List<FieldPickup>();
         readonly List<GridActor> boardActors = new List<GridActor>();
-        readonly List<Vector2Int> validSpawnCells = new List<Vector2Int>();
-        readonly HashSet<Vector2Int> processCells = new HashSet<Vector2Int>();
+        readonly List<Vector2Int> validSpawnCells = new List<Vector2Int>(100);
+        readonly HashSet<Vector2Int> blockedSpawnCells = new HashSet<Vector2Int>();
         float processSpawnClock;
-        float enemySpawnClock;
-        int stationSpawnIndex;
-        int enemySpawnIndex;
-        int nextEnemySpawnEdge;
+        float itemSpawnClock;
 
+        public RunLoopController RunLoop => runLoop;
+        public BoardGrid Board => board;
+        public GridActor Duck => duck;
+        public GridActor Seal => seal;
+        public GridActor Cat => cat;
+        public GridActor Pufferfish => pufferfish;
         public int Cash => cash;
+        public int Score => score;
         public int ProcessedStations => processedStations;
+        public string StatusMessage => statusMessage;
+        public bool ShopOpen { get; private set; }
         public IReadOnlyList<GridActor> Enemies => enemies;
         public IReadOnlyList<ActivityStation> Stations => stations;
+        public IReadOnlyList<FieldPickup> FieldItems => fieldItems;
+        public event Action RunDataChanged;
 
         void OnEnable()
         {
-            if (runLoop) runLoop.RunRestarted += ResetForNewRun;
+            if (runLoop)
+            {
+                runLoop.RunRestarted += ResetForNewRun;
+                runLoop.RunEnded += HandleRunEnded;
+            }
         }
 
         void OnDisable()
         {
-            if (runLoop) runLoop.RunRestarted -= ResetForNewRun;
+            if (runLoop)
+            {
+                runLoop.RunRestarted -= ResetForNewRun;
+                runLoop.RunEnded -= HandleRunEnded;
+            }
+        }
+
+        void HandleRunEnded(RunState result)
+        {
+            ShopOpen = false;
+            statusMessage = result == RunState.RunComplete ? "Run complete." : "Team defeated.";
+            RunDataChanged?.Invoke();
         }
 
         void Awake()
         {
-            if (!runLoop || !stage || !board || !duck || !seal || !enemyPrefab || !casinoPrefab)
+            if (!runLoop || !stage || !board || !duck || !seal || !cat || !pufferfish || !enemyPrefab || !casinoPrefab)
             {
-                Debug.LogError("MainRunGameplaySystems requires RunLoop, Stage, Board, Duck, Seal, and both prototype prefabs.", this);
+                Debug.LogError("MainRunGameplaySystems requires the RunLoop, Stage, Board, four team members, and prototype prefabs.", this);
                 enabled = false;
                 return;
             }
 
             if (!enemyContainer) enemyContainer = transform;
             if (!processContainer) processContainer = transform;
+            if (!pickupContainer) pickupContainer = processContainer;
+            seal.damageForFullCharge = cat.damageForFullCharge = pufferfish.damageForFullCharge = ultimateChargePerDamage;
             ResetForNewRun();
         }
 
@@ -87,29 +190,37 @@ namespace AlienAllIn
             float dt = runLoop.GameplayDeltaTime;
             if (dt <= 0f) return;
 
+            AdvanceTeamRuntime(dt);
+            AdvanceEconomy(dt);
             RefreshBoardOccupancy();
-            AdvanceSpawnClocks(dt);
-            TickSeal(dt);
+            AdvanceProcessSpawn(dt);
+            AdvanceItemSpawn(dt);
+            TickCombat(dt);
             TickDuck(dt);
             AdvanceProcesses(dt);
             RefreshBoardOccupancy();
-            TickEnemies(dt);
-            CleanupDeadEnemies();
+            CleanupRuntimeObjects();
             RefreshBoardOccupancy();
+        }
+
+        void AdvanceTeamRuntime(float dt)
+        {
+            foreach (GridActor actor in runLoop.Survivors)
+                if (actor && actor.Alive) actor.AdvanceRuntime(dt);
         }
 
         void ResetForNewRun()
         {
-            ClearSpawned(enemies);
             ClearSpawned(stations);
-            cash = 0;
-            processedStations = 0;
+            ClearSpawned(fieldItems);
+            cash = score = processedStations = 0;
             processSpawnClock = 0f;
-            enemySpawnClock = Mathf.Max(.1f, firstEnemyDelaySeconds);
-            stationSpawnIndex = 0;
-            enemySpawnIndex = 0;
-            nextEnemySpawnEdge = 0;
-            statusMessage = "No Process station yet.";
+            itemSpawnClock = Mathf.Max(.1f, firstItemSpawnDelaySeconds);
+            ShopOpen = false;
+            statusMessage = "Run ready. Start with empty inventories.";
+            ResetEconomyForNewRun();
+            ResetCombatForNewRun();
+            RunDataChanged?.Invoke();
         }
 
         void ClearSpawned<T>(List<T> spawned) where T : Component
@@ -123,67 +234,97 @@ namespace AlienAllIn
             spawned.Clear();
         }
 
-        void AdvanceSpawnClocks(float dt)
+        void AdvanceProcessSpawn(float dt)
         {
-            float processInterval = Mathf.Max(1f, processSpawnIntervalSeconds);
+            float interval = Mathf.Max(1f, processSpawnIntervalSeconds);
             processSpawnClock += dt;
-            while (processSpawnClock >= processInterval)
+            while (processSpawnClock >= interval)
             {
-                processSpawnClock -= processInterval;
-                if (Random.value < Mathf.Clamp01(processSpawnChance)) TrySpawnCasino();
+                processSpawnClock -= interval;
+                if (UnityEngine.Random.value <= Mathf.Clamp01(processSpawnChance)) TrySpawnActivity();
+                else statusMessage = "No activity this Process roll.";
             }
-
-            enemySpawnClock -= dt;
-            if (enemySpawnClock > 0f) return;
-
-            if (CountLivingEnemies() < Mathf.Max(1, maxEnemies)) TrySpawnEnemy();
-            enemySpawnClock = Mathf.Max(.1f, enemySpawnIntervalSeconds);
         }
 
-        bool TrySpawnCasino()
+        bool TrySpawnActivity()
+        {
+            ActivityPrototypeSettings settings = ChooseActivityPrototype();
+            if (settings == null)
+            {
+                statusMessage = "No configured Process activity.";
+                return false;
+            }
+
+            if (!TryChooseOpenCell(true, out Vector2Int selectedCell))
+            {
+                statusMessage = "Process roll skipped: no valid cell; try next interval.";
+                return false;
+            }
+
+            BoardCell boardCell = board.GetCell(selectedCell);
+            foreach (GridActor actor in boardCell.Occupants)
+            {
+                if (!actor || !actor.Alive || actor.kind != ActorKind.Enemy) continue;
+                RemoveEnemyByCrush(actor);
+            }
+
+            ActivityStation station = Instantiate(casinoPrefab, board.CellCenter(selectedCell), Quaternion.identity, processContainer);
+            station.name = $"{settings.kind.ToString().ToUpperInvariant()} {stations.Count + 1:00}";
+            station.activityKind = settings.kind;
+            station.activityName = ActivityLabel(settings.kind);
+            station.requiredKind = settings.owner;
+            station.board = board;
+            station.duration = Mathf.Max(1f, settings.durationSeconds);
+            station.cashTickSeconds = Mathf.Max(.05f, settings.cashTickSeconds);
+            station.scoreTickSeconds = Mathf.Max(0f, settings.processScoreTickSeconds);
+            station.allowUniversalDuckWorker = true;
+            station.interruptionSeconds = Mathf.Max(0f, processInterruptionSeconds);
+            station.ResetActivity();
+            if (station.marker) station.marker.color = settings.markerColor;
+            stations.Add(station);
+            statusMessage = $"{station.activityName} spawned at {boardCell.Address}.";
+            RunDataChanged?.Invoke();
+            return true;
+        }
+
+        ActivityPrototypeSettings ChooseActivityPrototype()
+        {
+            if (activitySettings == null || activitySettings.Length == 0) return null;
+            int validCount = 0;
+            for (int i = 0; i < activitySettings.Length; i++) if (activitySettings[i] != null) validCount++;
+            if (validCount == 0) return null;
+            int chosen = UnityEngine.Random.Range(0, validCount);
+            for (int i = 0; i < activitySettings.Length; i++)
+            {
+                if (activitySettings[i] == null) continue;
+                if (chosen-- == 0) return activitySettings[i];
+            }
+            return null;
+        }
+
+        bool TryChooseOpenCell(bool allowEnemy, out Vector2Int cell)
         {
             validSpawnCells.Clear();
-            foreach (Vector2Int cell in stage.ProcessSpawnCandidates)
+            foreach (Vector2Int candidate in stage.ProcessSpawnCandidates)
             {
-                BoardCell boardCell = board.GetCell(cell);
-                if (!boardCell || HasStationAt(cell)) continue;
-
-                bool blockedByAlien = false;
+                BoardCell boardCell = board.GetCell(candidate);
+                if (!boardCell || HasStationAt(candidate) || HasItemAt(candidate)) continue;
+                bool blocked = false;
                 foreach (GridActor actor in boardCell.Occupants)
                 {
-                    if (actor && actor.Alive && actor.kind != ActorKind.Enemy)
-                    {
-                        blockedByAlien = true;
-                        break;
-                    }
+                    if (!actor || !actor.Alive) continue;
+                    if (actor.kind != ActorKind.Enemy || !allowEnemy) { blocked = true; break; }
                 }
-                if (!blockedByAlien) validSpawnCells.Add(cell);
+                if (!blocked) validSpawnCells.Add(candidate);
             }
 
             if (validSpawnCells.Count == 0)
             {
-                statusMessage = "Casino roll skipped: no valid cell. Try again next interval.";
+                cell = default;
                 return false;
             }
 
-            Vector2Int selectedCell = validSpawnCells[Random.Range(0, validSpawnCells.Count)];
-            BoardCell selectedBoardCell = board.GetCell(selectedCell);
-            foreach (GridActor actor in selectedBoardCell.Occupants)
-                if (actor && actor.Alive && actor.kind == ActorKind.Enemy) actor.Hurt(actor.Health);
-
-            ActivityStation stationInstance = Instantiate(
-                casinoPrefab, board.CellCenter(selectedCell), Quaternion.identity, processContainer);
-            stationInstance.name = $"CASINO {++stationSpawnIndex:00}";
-            stationInstance.activityName = "CASINO";
-            stationInstance.requiredKind = ActorKind.Seal;
-            stationInstance.board = board;
-            stationInstance.duration = Mathf.Max(1f, casinoDurationSeconds);
-            stationInstance.cashTickSeconds = Mathf.Max(.05f, cashTickSeconds);
-            stationInstance.allowUniversalDuckWorker = true;
-            stationInstance.interruptionSeconds = Mathf.Max(0f, processInterruptionSeconds);
-            stationInstance.ResetActivity();
-            stations.Add(stationInstance);
-            statusMessage = $"CASINO spawned at {selectedBoardCell.Address}.";
+            cell = validSpawnCells[UnityEngine.Random.Range(0, validSpawnCells.Count)];
             return true;
         }
 
@@ -194,59 +335,148 @@ namespace AlienAllIn
             return false;
         }
 
-        void TrySpawnEnemy()
+        bool HasItemAt(Vector2Int cell)
         {
-            processCells.Clear();
-            foreach (ActivityStation station in stations)
-                if (station && board.TryWorldToCell(station.transform.position, out Vector2Int cell)) processCells.Add(cell);
-
-            GridActor enemy = GridEnemySpawner.SpawnAtActiveEdges(
-                board, enemyPrefab, enemyContainer, ref enemySpawnIndex, ref nextEnemySpawnEdge, processCells);
-            if (enemy) enemies.Add(enemy);
+            foreach (FieldPickup item in fieldItems)
+            {
+                if (!item || item.Collected) continue;
+                if (board.TryWorldToCell(item.transform.position, out Vector2Int itemCell) && itemCell == cell) return true;
+            }
+            return false;
         }
 
-        void TickSeal(float dt)
+        void AdvanceItemSpawn(float dt)
         {
-            if (!seal || !seal.Alive || !seal.CountsAsActiveRunMember) return;
+            if (fieldItems.Count >= Mathf.Max(1, maxFieldItems)) return;
+            itemSpawnClock -= dt;
+            if (itemSpawnClock > 0f) return;
 
-            seal.State = ActorState.Defending;
-            seal.AttackTimer -= dt;
-            bool inRange = false;
-            foreach (GridActor enemy in enemies)
+            itemSpawnClock = Mathf.Max(.1f, itemSpawnIntervalSeconds);
+            if (!TryChooseOpenCell(false, out Vector2Int cell))
             {
-                if (enemy && enemy.Alive && Vector3.Distance(enemy.transform.position, seal.transform.position) <= seal.attackRange)
-                {
-                    inRange = true;
-                    break;
-                }
+                statusMessage = "Item drop skipped: no open cell.";
+                return;
             }
-            if (!inRange || seal.AttackTimer > 0f) return;
 
-            CombatAndSpawnRules.ResolveSealAoe(
-                seal, enemies, board, seal.attackRange, seal.damage, sealKnockbackDistance);
-            seal.AttackTimer = seal.attackInterval;
+            FieldItemKind itemKind = (FieldItemKind)UnityEngine.Random.Range(0, 3);
+            var itemObject = new GameObject($"Item {itemKind}");
+            itemObject.transform.SetParent(pickupContainer, false);
+            itemObject.transform.position = board.CellCenter(cell);
+            var renderer = itemObject.AddComponent<SpriteRenderer>();
+            renderer.sprite = itemSprite;
+            renderer.color = ItemColor(itemKind);
+            renderer.sortingOrder = 3;
+            itemObject.transform.localScale = Vector3.one * .36f;
+            var pickup = itemObject.AddComponent<FieldPickup>();
+            pickup.itemKind = itemKind;
+            pickup.quantity = 1;
+            pickup.trampolineCount = 1;
+            fieldItems.Add(pickup);
+            statusMessage = $"{itemKind} drop appeared at {board.GetCell(cell).Address}.";
+            RunDataChanged?.Invoke();
         }
 
         void TickDuck(float dt)
         {
-            if (!duck || !duck.Alive || !duck.CountsAsActiveRunMember) return;
+            if (!duck || !duck.Alive) return;
 
-            ActivityStation target = FindNearestIncompleteStation(duck.transform.position);
-            if (!target)
+            if (duck.UltimateFull && !duck.IsUltimateActive)
             {
+                duck.BeginDuckOverdrive(duckUltimateDurationSeconds);
+                statusMessage = "Duck triggered Auto Overdrive.";
+            }
+
+            bool targeted = IsDuckTargetedByEnemy();
+            if (duck.IsUltimateActive)
+            {
+                TickDuckMovementAndWork(dt);
+                return;
+            }
+
+            if (duck.State == ActorState.Hiding)
+            {
+                if (targeted) return;
                 duck.State = ActorState.Idle;
-                return;
             }
-
-            float workDistance = .15f * board.cellSize;
-            if (Vector3.Distance(duck.transform.position, target.transform.position) <= workDistance)
+            else if (targeted)
             {
-                duck.State = ActorState.Working;
+                duck.State = ActorState.Panic;
+                duck.AddUltimateCharge(duckPanicChargePerSecond * dt);
+                return;
+            }
+            else if (duck.State == ActorState.Panic)
+            {
+                // Panic persists until the player places Duck behind another team member.
+                duck.AddUltimateCharge(duckPanicChargePerSecond * dt);
                 return;
             }
 
-            duck.State = ActorState.Moving;
-            duck.MoveTowards(target.transform.position, dt);
+            TickDuckMovementAndWork(dt);
+        }
+
+        void TickDuckMovementAndWork(float dt)
+        {
+            FieldPickup item = FindNearestAvailableItem(duck.transform.position);
+            if (item)
+            {
+                duck.State = ActorState.Collecting;
+                MoveActorAlongGrid(duck, item.transform.position, dt, duck.IsUltimateActive ? duckUltimateMoveMultiplier : 1f);
+                if (Vector3.Distance(duck.transform.position, item.transform.position) <= .2f * board.cellSize)
+                {
+                    if (item.TryCollect(out FieldItemKind kind, out int quantity))
+                    {
+                        AddItem(kind, quantity);
+                        duck.AddUltimateCharge(duckItemCharge);
+                        statusMessage = $"Duck collected {kind} +{quantity}.";
+                        RunDataChanged?.Invoke();
+                    }
+                }
+                return;
+            }
+
+            ActivityStation station = FindNearestIncompleteStation(duck.transform.position);
+            if (!station)
+            {
+                duck.State = duck.IsUltimateActive ? ActorState.UsingUltimate : ActorState.Idle;
+                return;
+            }
+
+            if (Vector3.Distance(duck.transform.position, station.transform.position) > .15f * board.cellSize)
+            {
+                duck.State = duck.IsUltimateActive ? ActorState.UsingUltimate : ActorState.Moving;
+                MoveActorAlongGrid(duck, station.transform.position, dt, duck.IsUltimateActive ? duckUltimateMoveMultiplier : 1f);
+            }
+            else
+            {
+                duck.State = duck.IsUltimateActive ? ActorState.UsingUltimate : ActorState.Working;
+            }
+        }
+
+        void MoveActorAlongGrid(GridActor actor, Vector3 destination, float dt, float speedMultiplier)
+        {
+            Vector3 currentLocal = board.transform.InverseTransformPoint(actor.transform.position);
+            Vector3 targetLocal = board.transform.InverseTransformPoint(destination);
+            Vector3 target = Mathf.Abs(targetLocal.x - currentLocal.x) > .03f
+                ? board.transform.TransformPoint(new Vector3(targetLocal.x, currentLocal.y, currentLocal.z))
+                : board.transform.TransformPoint(new Vector3(currentLocal.x, targetLocal.y, targetLocal.z));
+            actor.MoveTowards(target, dt * Mathf.Max(.01f, speedMultiplier));
+            if (Vector3.Distance(actor.transform.position, destination) <= .03f * board.cellSize)
+                actor.MoveTowards(destination, dt * Mathf.Max(.01f, speedMultiplier));
+        }
+
+        FieldPickup FindNearestAvailableItem(Vector3 position)
+        {
+            FieldPickup nearest = null;
+            float bestDistance = float.PositiveInfinity;
+            foreach (FieldPickup pickup in fieldItems)
+            {
+                if (!pickup || pickup.Collected) continue;
+                float distance = (pickup.transform.position - position).sqrMagnitude;
+                if (distance >= bestDistance) continue;
+                bestDistance = distance;
+                nearest = pickup;
+            }
+            return nearest;
         }
 
         ActivityStation FindNearestIncompleteStation(Vector3 position)
@@ -256,12 +486,34 @@ namespace AlienAllIn
             foreach (ActivityStation station in stations)
             {
                 if (!station || station.Complete) continue;
-                float distance = Vector3.Distance(position, station.transform.position);
+                float distance = (station.transform.position - position).sqrMagnitude;
                 if (distance >= bestDistance) continue;
                 bestDistance = distance;
                 nearest = station;
             }
             return nearest;
+        }
+
+        GridActor FindStationWorker(ActivityStation station)
+        {
+            if (!station) return null;
+            GridActor owner = GetActor(station.requiredKind);
+            if (IsStandingAt(owner, station)) return owner;
+            if (station.allowUniversalDuckWorker && IsStandingAt(duck, station) && duck.State != ActorState.Panic)
+                return duck;
+            return null;
+        }
+
+        bool IsStandingAt(GridActor actor, ActivityStation station) =>
+            actor && actor.Alive && actor.IsOnBoard && actor.CurrentCell == station.Cell &&
+            Vector3.Distance(actor.transform.position, station.transform.position) <= .15f * board.cellSize;
+
+        float GetProcessingRate(GridActor worker)
+        {
+            if (!worker || worker.kind != ActorKind.Duck) return 1f;
+            float rate = Mathf.Max(1f, duckProcessingMultiplier);
+            if (duck.IsUltimateActive) rate += Mathf.Max(0f, duckUltimateProcessBonus);
+            return rate;
         }
 
         void AdvanceProcesses(float dt)
@@ -275,87 +527,51 @@ namespace AlienAllIn
                     continue;
                 }
 
-                cash += station.Advance(dt, duck, false, duckProcessingMultiplier);
+                GridActor worker = FindStationWorker(station);
+                if (!worker) continue;
+                int scoreTicks;
+                int cashTicks = station.Advance(dt, worker, false, GetProcessingRate(worker), station.scoreTickSeconds, out scoreTicks);
+                if (cashTicks > 0) AddCash(cashTicks * Mathf.Max(0, cashPerTick), $"Cash +{cashTicks * cashPerTick}");
+                if (scoreTicks > 0) AddScore(Mathf.RoundToInt(scoreTicks * Mathf.Max(0f, pointsPerProcessingTick)), "Processing");
+                if (worker == duck) duck.AddUltimateCharge(duckProcessChargePerSecond * dt);
                 if (!station.Complete) continue;
 
                 processedStations++;
-                statusMessage = $"{station.activityName} processed.";
-                if (duck) duck.State = ActorState.Idle;
+                AddScore(pointsPerProcessed, $"{station.activityName} Processed");
+                statusMessage = $"{station.activityName} solved and removed.";
+                if (worker == duck && !duck.IsUltimateActive) duck.State = ActorState.Idle;
                 Destroy(station.gameObject);
                 stations.RemoveAt(i);
+                RunDataChanged?.Invoke();
             }
         }
 
-        void TickEnemies(float dt)
+        void RemoveEnemyByCrush(GridActor enemy)
         {
-            foreach (GridActor enemy in enemies)
-            {
-                if (!enemy || !enemy.Alive) continue;
-                ChooseEnemyTarget(enemy.transform.position, out GridActor alienTarget, out ActivityStation stationTarget);
-                if (alienTarget)
-                {
-                    CombatAndSpawnRules.TickMelee(enemy, alienTarget.transform.position, dt, () =>
-                    {
-                        alienTarget.Hurt(enemy.damage);
-                        InterruptStationWorkedBy(alienTarget);
-                    });
-                }
-                else if (stationTarget)
-                {
-                    CombatAndSpawnRules.TickMelee(enemy, stationTarget.transform.position, dt, stationTarget.Interrupt);
-                }
-            }
+            if (!enemy || !enemy.Alive) return;
+            enemy.Eliminate();
+            RegisterCrushKill(enemy);
+            statusMessage = "Enemy was crushed by a Process station.";
         }
 
-        void ChooseEnemyTarget(Vector3 enemyPosition, out GridActor alienTarget, out ActivityStation stationTarget)
-        {
-            alienTarget = null;
-            stationTarget = null;
-            float bestDistance = float.PositiveInfinity;
-
-            foreach (GridActor alien in runLoop.Survivors)
-            {
-                if (!alien || !alien.Alive || !alien.CountsAsActiveRunMember) continue;
-                float distance = Vector3.Distance(enemyPosition, alien.transform.position);
-                if (distance >= bestDistance) continue;
-                bestDistance = distance;
-                alienTarget = alien;
-                stationTarget = null;
-            }
-
-            foreach (ActivityStation station in stations)
-            {
-                if (!station || station.Complete) continue;
-                float distance = Vector3.Distance(enemyPosition, station.transform.position);
-                if (distance >= bestDistance) continue;
-                bestDistance = distance;
-                stationTarget = station;
-                alienTarget = null;
-            }
-        }
-
-        void InterruptStationWorkedBy(GridActor worker)
-        {
-            foreach (ActivityStation station in stations)
-                if (station && station.CurrentWorker == worker) station.Interrupt();
-        }
-
-        void CleanupDeadEnemies()
+        void CleanupRuntimeObjects()
         {
             for (int i = enemies.Count - 1; i >= 0; i--)
             {
                 GridActor enemy = enemies[i];
                 if (enemy && enemy.Alive && enemy.gameObject.activeInHierarchy) continue;
                 if (enemy) Destroy(enemy.gameObject);
+                OnEnemyRemoved(enemy);
                 enemies.RemoveAt(i);
             }
-        }
 
-        int CountLivingEnemies()
-        {
-            int count = 0;
-            foreach (GridActor enemy in enemies) if (enemy && enemy.Alive) count++;
-            return count;
+            for (int i = fieldItems.Count - 1; i >= 0; i--)
+            {
+                FieldPickup pickup = fieldItems[i];
+                if (pickup && !pickup.Collected && pickup.gameObject.activeInHierarchy) continue;
+                if (pickup) Destroy(pickup.gameObject);
+                fieldItems.RemoveAt(i);
+            }
         }
 
         void RefreshBoardOccupancy()
@@ -366,49 +582,98 @@ namespace AlienAllIn
             board.RefreshOccupancy(boardActors);
         }
 
-        void OnGUI()
+        GridActor GetActor(ActorKind kind)
         {
-            const float x = 16f;
-            const float y = 164f;
-            const float width = 196f;
-            int stationRows = Mathf.Min(4, stations.Count);
-            int enemyRows = Mathf.Min(5, CountLivingEnemies());
-            float height = 58f + stationRows * 20f + enemyRows * 18f + 20f;
-            GUI.Box(new Rect(x, y, width, height), string.Empty);
-            GUI.Label(new Rect(x + 8f, y + 6f, width - 16f, 20f), "RUN SYSTEMS");
-            GUI.Label(new Rect(x + 8f, y + 26f, width - 16f, 20f), $"CASH: {cash}   PROCESSED: {processedStations}");
-
-            float rowY = y + 48f;
-            for (int i = 0; i < stationRows; i++)
+            switch (kind)
             {
-                ActivityStation station = stations[i];
-                if (!station) continue;
-                string state = station.IsInterrupted
-                    ? $"PAUSED {station.InterruptionRemaining:0.0}s"
-                    : $"{Mathf.RoundToInt(station.Progress * 100f)}%";
-                GUI.Label(new Rect(x + 8f, rowY, width - 16f, 18f), $"{station.activityName}: {state}");
-                rowY += 20f;
+                case ActorKind.Seal: return seal;
+                case ActorKind.Cat: return cat;
+                case ActorKind.Pufferfish: return pufferfish;
+                case ActorKind.Duck: return duck;
+                default: return null;
             }
-            if (stations.Count > stationRows)
-            {
-                GUI.Label(new Rect(x + 8f, rowY, width - 16f, 18f), $"+ {stations.Count - stationRows} more stations");
-                rowY += 20f;
-            }
+        }
 
-            int shownEnemies = 0;
+        public bool IsCellReserved(Vector2Int cell)
+        {
+            if (HasStationAt(cell) || HasItemAt(cell)) return true;
+            BoardCell target = board.GetCell(cell);
+            if (!target) return true;
+            foreach (GridActor actor in target.Occupants)
+                if (actor && actor.Alive) return true;
+            return false;
+        }
+
+        bool IsDuckTargetedByEnemy()
+        {
+            foreach (GridActor enemy in enemies)
+                if (enemy && enemy.Alive && IsEnemyTargetingDuck(enemy)) return true;
+            return false;
+        }
+
+        bool IsBehindLivingAlien(Vector3 position, GridActor duckActor)
+        {
+            GridActor ally = null;
+            float allyDistance = float.PositiveInfinity;
+            foreach (GridActor actor in runLoop.Survivors)
+            {
+                if (!actor || actor == duckActor || !actor.Alive || actor.kind == ActorKind.Duck) continue;
+                float distance = (actor.transform.position - position).sqrMagnitude;
+                if (distance >= allyDistance) continue;
+                allyDistance = distance;
+                ally = actor;
+            }
+            if (!ally || allyDistance > 1.15f * 1.15f) return false;
+
+            GridActor threat = FindNearestEnemy(position, float.PositiveInfinity);
+            if (!threat) return true;
+            Vector2 behind = (Vector2)(position - ally.transform.position);
+            Vector2 fromThreat = (Vector2)(ally.transform.position - threat.transform.position);
+            return Vector2.Dot(behind, fromThreat) > 0f &&
+                   Vector3.Distance(position, threat.transform.position) >= Vector3.Distance(ally.transform.position, threat.transform.position);
+        }
+
+        GridActor FindNearestEnemy(Vector3 position, float maxDistance)
+        {
+            GridActor nearest = null;
+            float bestSqr = maxDistance * maxDistance;
             foreach (GridActor enemy in enemies)
             {
                 if (!enemy || !enemy.Alive) continue;
-                if (shownEnemies >= enemyRows) break;
-                GUI.Label(new Rect(x + 8f, rowY, width - 16f, 18f), $"{enemy.name} HP {Mathf.CeilToInt(enemy.Health)}/{enemy.maxHealth}");
-                rowY += 18f;
-                shownEnemies++;
+                float distance = (enemy.transform.position - position).sqrMagnitude;
+                if (distance >= bestSqr) continue;
+                bestSqr = distance;
+                nearest = enemy;
             }
-            int remainingEnemies = CountLivingEnemies() - shownEnemies;
-            if (remainingEnemies > 0)
-                GUI.Label(new Rect(x + 8f, rowY, width - 16f, 18f), $"+ {remainingEnemies} more enemies");
-            else if (shownEnemies == 0)
-                GUI.Label(new Rect(x + 8f, rowY, width - 16f, 18f), statusMessage);
+            return nearest;
+        }
+
+        static string ActivityLabel(ActivityKind kind)
+        {
+            switch (kind)
+            {
+                case ActivityKind.Darts: return "DARTS";
+                case ActivityKind.JumpRope: return "JUMP ROPE";
+                default: return "CASINO";
+            }
+        }
+
+        static Color ItemColor(FieldItemKind kind)
+        {
+            switch (kind)
+            {
+                case FieldItemKind.AirPump: return new Color(.42f, .82f, 1f, 1f);
+                case FieldItemKind.LaserGun: return new Color(.85f, .63f, 1f, 1f);
+                default: return new Color(1f, .82f, .34f, 1f);
+            }
+        }
+
+        void OnDestroy()
+        {
+            if (!Application.isPlaying) return;
+            ClearSpawned(stations);
+            ClearSpawned(fieldItems);
+            ClearCombatRuntimeObjects();
         }
     }
 }

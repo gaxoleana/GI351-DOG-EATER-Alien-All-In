@@ -31,6 +31,8 @@ namespace AlienAllIn
         [Header("Live run state")]
         [SerializeField] RunState state = RunState.Placement;
         [SerializeField, Min(0f)] float elapsedSeconds;
+        [SerializeField, Tooltip("Enable the temporary legacy IMGUI debug panel; MainCoreGameplayUI replaces it in Main.")]
+        bool showLegacyDebugHud;
 
         readonly List<GridActor> survivorRoster = new List<GridActor>();
         readonly List<GridActor> actorsToReset = new List<GridActor>();
@@ -292,6 +294,7 @@ namespace AlienAllIn
 
         void OnGUI()
         {
+            if (!showLegacyDebugHud) return;
             const float width = 154f;
             const float height = 140f;
             GUI.Box(new Rect(16f, 16f, width, height), string.Empty);

@@ -4,12 +4,15 @@ namespace AlienAllIn
 {
     public sealed class ActivityStation : MonoBehaviour
     {
+        public ActivityKind activityKind = ActivityKind.Casino;
         public string activityName = "CASINO";
         public ActorKind requiredKind = ActorKind.Duck;
         public BoardGrid board;
         [Min(1)] public float duration = 36;
         [Min(.05f), Tooltip("Prototype interval for one Cash per tick while work is progressing.")]
         public float cashTickSeconds = 1f;
+        [Min(0f), Tooltip("Prototype interval for Processing score ticks. Zero disables Processing score ticks.")]
+        public float scoreTickSeconds = 2f;
         [Tooltip("The Duck can work any species' station as a universal processor.")]
         public bool allowUniversalDuckWorker = true;
         [Min(0f), Tooltip("Prototype pause applied after an Enemy hits this station or its current worker.")]
@@ -17,6 +20,7 @@ namespace AlienAllIn
         public SpriteRenderer marker;
         [SerializeField] float progress;
         float rewardClock;
+        float scoreClock;
         float interruptionRemaining;
         GridActor currentWorker;
         public float Progress => progress;
@@ -27,7 +31,7 @@ namespace AlienAllIn
         public Vector2Int Cell { get { board.TryWorldToCell(transform.position, out var cell); return cell; } }
         public void ResetActivity()
         {
-            progress = rewardClock = interruptionRemaining = 0;
+            progress = rewardClock = scoreClock = interruptionRemaining = 0;
             currentWorker = null;
             RefreshView();
         }
@@ -37,10 +41,15 @@ namespace AlienAllIn
             interruptionRemaining = Mathf.Max(interruptionRemaining, Mathf.Max(0f, interruptionSeconds));
         }
 
-        public int Advance(float dt, GridActor worker, bool threatened) => Advance(dt, worker, threatened, 1f);
+        public int Advance(float dt, GridActor worker, bool threatened) =>
+            Advance(dt, worker, threatened, 1f);
 
-        public int Advance(float dt, GridActor worker, bool threatened, float workRate)
+        public int Advance(float dt, GridActor worker, bool threatened, float workRate) =>
+            Advance(dt, worker, threatened, workRate, 0f, out _);
+
+        public int Advance(float dt, GridActor worker, bool threatened, float workRate, float processScoreTickSeconds, out int scoreTicks)
         {
+            scoreTicks = 0;
             if (dt <= 0f || Complete) return 0;
             if (interruptionRemaining > 0f)
             {
@@ -72,6 +81,13 @@ namespace AlienAllIn
             float tick = Mathf.Max(.05f, cashTickSeconds);
             int cash = Mathf.FloorToInt(rewardClock / tick);
             rewardClock -= cash * tick;
+            float scoreTick = Mathf.Max(0f, processScoreTickSeconds > 0f ? processScoreTickSeconds : scoreTickSeconds);
+            if (scoreTick > 0f)
+            {
+                scoreClock += work;
+                scoreTicks = Mathf.FloorToInt(scoreClock / scoreTick);
+                scoreClock -= scoreTicks * scoreTick;
+            }
             RefreshView();
             return cash;
         }

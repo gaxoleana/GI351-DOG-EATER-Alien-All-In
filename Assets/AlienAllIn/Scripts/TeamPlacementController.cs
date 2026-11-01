@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 
 namespace AlienAllIn
@@ -13,11 +14,14 @@ namespace AlienAllIn
         [SerializeField] RunLoopController runLoop;
         [SerializeField] BoardGrid board;
         [SerializeField] Camera stageCamera;
+        [SerializeField, Tooltip("Enable the legacy IMGUI placement panel; MainCoreGameplayUI replaces it in Main.")]
+        bool showLegacyPanel;
 
         const float PanelWidth = 152f;
         const float PanelHeight = 208f;
         GridActor selected;
         string message = "Ready to place.";
+        public string CurrentMessage => message;
 
         Rect PanelRect => new Rect(Screen.width - PanelWidth - 16f, 16f, PanelWidth, PanelHeight);
 
@@ -38,6 +42,7 @@ namespace AlienAllIn
             if (mouse == null || !mouse.leftButton.wasPressedThisFrame) return;
 
             Vector2 screenPosition = mouse.position.ReadValue();
+            if (IsPointerOverBlockingUI(screenPosition)) return;
             Vector2 guiPosition = new Vector2(screenPosition.x, Screen.height - screenPosition.y);
             if (PanelRect.Contains(guiPosition) || !stageCamera.pixelRect.Contains(screenPosition)) return;
 
@@ -111,11 +116,29 @@ namespace AlienAllIn
             message = $"{selected.kind} selected.";
         }
 
+        public void SelectActorFromUI(GridActor actor)
+        {
+            if (!runLoop || !runLoop.CanPlaceTeam || !actor || !actor.Alive) return;
+            selected = actor;
+            message = $"{selected.kind} selected.";
+        }
+
+        bool IsPointerOverBlockingUI(Vector2 screenPosition)
+        {
+            if (!EventSystem.current) return false;
+            var eventData = new PointerEventData(EventSystem.current) { position = screenPosition };
+            var results = new System.Collections.Generic.List<RaycastResult>();
+            EventSystem.current.RaycastAll(eventData, results);
+            foreach (RaycastResult result in results)
+                if (!result.gameObject.GetComponent<BoardDropSurface>()) return true;
+            return false;
+        }
+
         static string DisplayName(ActorKind kind) => kind == ActorKind.Pufferfish ? "Puff" : kind.ToString();
 
         void OnGUI()
         {
-            if (!runLoop) return;
+            if (!showLegacyPanel || !runLoop) return;
 
             Rect panel = PanelRect;
             GUI.Box(panel, string.Empty);

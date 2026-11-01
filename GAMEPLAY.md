@@ -5,11 +5,11 @@
 `Assets/Scenes/Main.unity` is the first enabled Build Settings scene. It contains
 the Stage 1 board shell: a 10x10 `BoardGrid`, with a 5x5 area open at 0% run
 progress and locked cells visible in a darker color. `RunLoopController` starts
-and pauses the run, shows a basic timer/status panel, and restarts the stage. It
+and pauses the run; `MainCoreGameplayUI` displays the timer/status and restarts the stage. It
 is connected to the four-member Seal, Cat, Pufferfish, and Duck roster. The
 team is editable in the RunLoop Inspector and appears under `Stage 1/Team`.
-Seal and Duck are the active run members in this slice. Cat and Pufferfish remain
-placeable roster members but have no run AI and do not prevent a team wipe.
+All four are active run members in Main; Cat/Pufferfish receive combat behavior
+and Duck participates in team defeat checks.
 
 `StageGridProgression` is the single Main-scene source for the prototype run
 duration (300 seconds) and grid milestones. The GDD leaves the final duration
@@ -20,8 +20,8 @@ elapsed-time clock. It exposes optional authored player start cells and the
 currently open cells as potential Process spawn candidates.
 The Stage start cells and RunLoop survivor roster contain the same four unique
 open cells/members. The `TeamPlacementController` uses `BoardGrid` occupancy and
-does not add colliders to each tile. During Placement, select a member from the
-roster panel (or press 1-4), then click an empty open cell to move it. Locked,
+does not add colliders to each tile. During Placement, select a member card (or
+press 1-4), then click an empty open cell to move it. Locked,
 outside, and teammate-occupied cells are rejected. Space only starts once all
 members are alive, inside the open grid, and in distinct cells.
 `RegisterSurvivor` is deduplicated and Restart keeps the existing roster instead
@@ -48,41 +48,86 @@ per member as a prototype value; the GDD does not set Alien HP.
 
 ## Main vertical slice
 
-`MainRunGameplaySystems` advances only while `RunLoopController` reports Running
-and uses its `GameplayDeltaTime`. Pause, terminal states, and Restart therefore
-freeze or reset Process, spawning, combat, and Cash with the same run clock.
-Restart removes runtime-created stations and enemies, clears Cash and Processed
-count, and resets spawn clocks. It does not create a second run outcome system.
+`MainRunGameplaySystems` extends the existing Stage and Run Loop. The Run Loop
+is the only owner of run time and outcomes; gameplay systems advance only with
+`GameplayDeltaTime`. Pause freezes movement, spawn clocks, projectiles, attacks,
+charge, Process, Cash, Score and shop restock. Restart removes runtime stations,
+pickups, enemies and projectiles, clears inventories/Cash/Score, resets shop
+stock, restores the four saved positions, HP/upgrades and Idle animations, then
+returns Stage progression to its starting area. RunComplete comes only from the
+timer. Defeated checks all four active members, including Duck. If the last
+member dies on the timeout frame, Defeated wins because the existing Run Loop
+resolves a team wipe before its timed result.
 
-The Main scene starts with no Process station. Prototype settings on
-`Stage 1/Run Systems` roll every 60 run seconds with a 25% chance to create one
-Casino station. It samples the current open grid, rejects cells with any Alien
-or another station, and allows an Enemy on the chosen cell to be crushed. If no
-eligible cell exists, that roll is skipped and tried again at the next interval;
-this is a temporary rule because the GDD leaves this case open. There is no
-extra station-count cap beyond available cells.
+Main starts in Placement with all four members on distinct cells in the open
+5x5 area. Select a card and click an open cell to arrange the roster. During a
+run, fighter cards can be dragged to an open cell only with a full personal
+Ultimate gauge; the move consumes that gauge. Duck may be dragged only while
+Panic, Hiding, Working, or recently hit. A Duck drop next to an Alien and behind
+it relative to the nearest threat marks it Hiding; this geometric reading of
+“behind” is a prototype rule. Space starts/pauses/resumes; R restarts.
 
-The Casino uses the existing `ActivityStation` as Seal's station. Duck can work
-any species' station and gets the GDD's 1.10 work-rate multiplier. Prototype
-duration is 36 seconds at the owner's rate; Cash pays +1 every 1 second of active
-work. When work reaches 100%, the station increments the Processed count once
-and is removed. No separate Cash completion bonus is added because the GDD does
-not specify one. An Enemy hit on the station or its current worker pauses work
-for 2 seconds while preserving progress. The station has no HP in this
-prototype; interruption duration and Cash/work timing are Inspector values.
+The field starts with no Process station and no carried Items. Every 60 run
+seconds, the Inspector-defined 25% roll may create Casino, Darts, or Jump Rope
+in a currently open valid cell. The three activities are selected uniformly at
+random as a temporary rule; the GDD names no fourth activity and does not define
+selection. A station cannot overlap an Alien, Item or another station. An
+Enemy on its cell is crushed. If no valid cell exists, the roll is skipped until
+the next interval, a temporary choice because the GDD leaves this case open.
+There is no separate station-count cap beyond available cells.
 
-Enemies reuse `Assets/AlienAllIn/Prefabs/Enemy.prefab` and the existing Gameplay
-prototype stats: HP 10, speed 0.8, damage 3, melee range 0.65, and 1.2-second
-attack cadence. Prototype spawning begins after 7 seconds, then checks every
-4.5 seconds up to 8 live enemies. Seal reuses its existing AOE/range/damage
-fields (range 2.7, damage 4, 0.75-second cadence) and 0.45-unit Knockback.
-Enemy timings and combat values remain editable prototype values, not final
-balance.
+The existing `ActivityStation` handles Process. Prototype durations are Casino
+36s, Darts 32s and Jump Rope 40s at owner rate. Duck can work any station at
+1.10x rate and receives another +15% while Overdrive is active. Each 1 second of
+active work pays +1 Cash; every 2 seconds adds +5 Score; completion adds +100
+Score, increments Processed once and removes the station. These tick timings are
+prototype values. Enemy hits preserve progress and pause work for 2 seconds.
+Stations have no HP. The GDD has not set these interruption and tick rules.
 
-The simple RUN SYSTEMS panel shows current Cash, Casino progress or interruption
-time, Processed count, and each live Enemy's HP. RunComplete still comes only
-from the timer; Defeated checks only Seal and Duck, the Main slice's members
-marked `countsAsActiveRunMember`.
+Duck prioritizes field Items over available Process and enters Panic while an
+Enemy targets it. It automatically walks to Items and stations; the player can
+drag it behind a teammate to hide. Items spawn after 8 seconds and every 28
+seconds, with a four-item field cap; these are adjustable prototype values.
+Duck's gauge gains +0.15 per pickup, +0.025 per second while processing and
++0.04 per second in Panic. A full gauge automatically starts a 7-second
+Overdrive with 1.35x movement speed. During Overdrive, Duck ignores Panic and
+continues Process through hits while still taking damage. Duck has no Attack
+gameplay and its Attack clip is never called.
+
+Seal performs AOE normal attacks with knockback; Cat hits one Enemy and stuns
+it; Pufferfish inflates, floats randomly, bounces from the board, Enemies and
+stations and teammates, and deals reduced contact damage with a repeat-hit cooldown.
+Pufferfish can be picked up only while floating and with a full Ultimate gauge.
+Fighter gauges charge from damage dealt; one full gauge is 30 damage. Matching Items
+require a full gauge, consume both Item and gauge, then activate that fighter's
+Ultimate. Seal's expanding ripple loses damage with distance; Cat emits eight
+rotating laser spokes; Pufferfish's Ultimate increases float speed and contact
+damage. Ultimate Switch requires two full fighter gauges, swaps their positions
+and activates both Ultimates. Timing, range, cadence and damage are Inspector
+prototypes.
+
+The shared Enemy prefab is configured at runtime as one of three archetypes,
+each with 10 HP. Roaster (melee) approaches the team, retreats from its nearest
+threat at 20% HP or less, then takes a prototype 0.75s bite to restore +5 HP once.
+Toaster (ranged) keeps distance from fighters except Duck and fires target-following
+projectiles. Pan advances more slowly, reduces incoming damage by 20%, and uses a
+short-range fry AOE that also interrupts nearby Process stations. Prototype spawn
+settings are 7s initial delay, 4.5s interval and eight live Enemies; per-type
+weights, speed, range, damage and cooldown are editable. Pan's always-on damage
+reduction, Toaster's preferred range, and Roaster's eat/retreat timing are
+temporary interpretations of the GDD.
+
+Cash and Score are separate. Cash upgrades Damage, cast speed and HP. The Chip
+Shop sells Seal, Cat and Pufferfish Chips; bought Chips enter inventory and
+must be dragged onto the matching fighter. Upgrade/Chip prices and effects,
+stock capacity and 90s restock are prototype values. The basic UI shows time,
+run state, team HP/gauges, Process and Enemy HP, Item/Chip inventory, Cash and
+Score. GDD score values are Hit +10, Processing +5 per prototype tick, Processed
++100, normal Kill +50 and Ultimate Kill +100. Ultimate Kill is exclusive to
+normal Kill in this prototype; the GDD leaves additive versus replacement open.
+No Kill Count is shown. The GDD's fourth Process type remains unspecified and
+is intentionally absent. Charge, drop, duration, economy and interruption
+details that the GDD leaves open remain Inspector prototypes for review.
 
 `Assets/Scenes/Gameplay.unity` remains the playable duck + seal reference scene
 described below; it was kept separate from the Stage 1 entry scene.
@@ -159,12 +204,10 @@ to see grid/range gizmos. Occupancy and inspector values refresh during play.
 
 ## Scope and prototype assumptions
 
-This is a duck + seal gameplay slice with simple Unity sprite assets, not full
-demo parity. Cat, pufferfish, random stages, the chip shop, upgrades, paired
-Switch swaps, cinematic camera effects and final art/audio are not implemented.
-All tuning values other than enemy 10 HP are prototype choices. Casino/jump rope
-are fixed for repeatable testing. Trampoline boosts one attack; Switch relocation
-costs 30 damage worth of charge. No real-money betting is implemented.
+`Gameplay.unity` remains a separate Duck + Seal reference scene with its own
+prototype loop and objectives. Main's broader systems are described above and
+do not overwrite that reference scene. Both use simple geometric/pixel-art
+placeholders rather than final art, and no real-money betting is implemented.
 
 ## Verification
 

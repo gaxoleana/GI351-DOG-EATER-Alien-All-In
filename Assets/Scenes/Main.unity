@@ -1060,6 +1060,7 @@ MonoBehaviour:
   runLoop: {fileID: 1371843182}
   board: {fileID: 446845523}
   stageCamera: {fileID: 664970849}
+  showLegacyPanel: 0
 --- !u!1 &165443799
 GameObject:
   m_ObjectHideFlags: 0
@@ -1514,6 +1515,7 @@ GameObject:
   m_Component:
   - component: {fileID: 198877239}
   - component: {fileID: 198877240}
+  - component: {fileID: 198877241}
   m_Layer: 0
   m_Name: Run Systems
   m_TagString: Untagged
@@ -1536,6 +1538,7 @@ Transform:
   m_Children:
   - {fileID: 200366913}
   - {fileID: 687555653}
+  - {fileID: 272644534}
   m_Father: {fileID: 1371843181}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &198877240
@@ -1550,28 +1553,155 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: df07a7b9e8480974fb5d40b6de58873e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: AlienAllIn.Runtime::AlienAllIn.MainRunGameplaySystems
+  ultimateChargePerDamage: 30
+  sealUltimateDuration: 3
+  catLaserReach: 10
+  toasterProjectileRadius: 0.12
+  shopOpenOnlyWhileRunning: 1
   runLoop: {fileID: 1371843182}
   stage: {fileID: 1371843180}
   board: {fileID: 446845523}
   duck: {fileID: 121809680}
   seal: {fileID: 1246218288}
+  cat: {fileID: 1322486272}
+  pufferfish: {fileID: 1226374788}
   enemyPrefab: {fileID: 6194910739404016673, guid: f037d4da808f43b4a8afa4ab0b9eebe0, type: 3}
   casinoPrefab: {fileID: 1313235792489912841, guid: 30b90d8433659594299a9522c5963b9d, type: 3}
+  itemSprite: {fileID: 7482667652216324306, guid: 7a8bb29e59ac3d74698d577c7f8aff02, type: 3}
+  projectileSprite: {fileID: 7482667652216324306, guid: 7a8bb29e59ac3d74698d577c7f8aff02, type: 3}
   enemyContainer: {fileID: 200366913}
   processContainer: {fileID: 687555653}
+  pickupContainer: {fileID: 272644534}
   processSpawnIntervalSeconds: 60
   processSpawnChance: 0.25
-  casinoDurationSeconds: 36
-  cashTickSeconds: 1
+  activitySettings:
+  - kind: 0
+    owner: 1
+    durationSeconds: 36
+    cashTickSeconds: 1
+    processScoreTickSeconds: 2
+    markerColor: {r: 0.92, g: 0.67, b: 0.28, a: 1}
+  - kind: 1
+    owner: 4
+    durationSeconds: 32
+    cashTickSeconds: 1
+    processScoreTickSeconds: 2
+    markerColor: {r: 0.45, g: 0.78, b: 0.98, a: 1}
+  - kind: 2
+    owner: 1
+    durationSeconds: 40
+    cashTickSeconds: 1
+    processScoreTickSeconds: 2
+    markerColor: {r: 0.63, g: 0.93, b: 0.64, a: 1}
   duckProcessingMultiplier: 1.1
+  duckUltimateProcessBonus: 0.15
   processInterruptionSeconds: 2
+  cashPerTick: 1
+  pointsPerProcessingTick: 5
+  duckPanicChargePerSecond: 0.04
+  duckProcessChargePerSecond: 0.025
+  duckItemCharge: 0.15
+  duckUltimateDurationSeconds: 7
+  duckUltimateMoveMultiplier: 1.35
+  firstItemSpawnDelaySeconds: 8
+  itemSpawnIntervalSeconds: 28
+  maxFieldItems: 4
+  sealKnockbackDistance: 0.45
+  sealRippleSpeed: 5
+  sealRippleDamageMultiplier: 2
+  sealRippleKnockback: 1.4
+  catStunSeconds: 1
+  catLaserDurationSeconds: 4
+  catLaserRevolutions: 2
+  catLaserHitIntervalSeconds: 0.5
+  catLaserDamage: 1.5
+  catLaserArcDegrees: 35
+  pufferInflateSeconds: 0.55
+  pufferFloatSeconds: 3.5
+  pufferFloatSpeed: 3
+  pufferCollisionRadius: 0.34
+  pufferDamageMultiplier: 0.5
+  pufferRepeatHitSeconds: 0.5
+  pufferUltimateSpeedMultiplier: 1.6
+  pufferUltimateDamageMultiplier: 2
   firstEnemyDelaySeconds: 7
   enemySpawnIntervalSeconds: 4.5
   maxEnemies: 8
-  sealKnockbackDistance: 0.45
+  enemySettings:
+  - archetype: 0
+    spawnWeight: 1
+    health: 10
+    moveSpeed: 0.8
+    damage: 3
+    attackRange: 0.65
+    attackInterval: 1.2
+    specialValue: 5
+    projectileSpeed: 5
+    shieldedDamageReduction: 0.2
+    displayColor: {r: 1, g: 0.72, b: 0.55, a: 1}
+  - archetype: 1
+    spawnWeight: 1
+    health: 10
+    moveSpeed: 0.65
+    damage: 2
+    attackRange: 5
+    attackInterval: 2.2
+    specialValue: 3.1
+    projectileSpeed: 5
+    shieldedDamageReduction: 0.2
+    displayColor: {r: 0.79, g: 0.72, b: 1, a: 1}
+  - archetype: 2
+    spawnWeight: 1
+    health: 10
+    moveSpeed: 0.45
+    damage: 3
+    attackRange: 0.8
+    attackInterval: 2.6
+    specialValue: 1.2
+    projectileSpeed: 5
+    shieldedDamageReduction: 0.2
+    displayColor: {r: 0.77, g: 0.85, b: 0.88, a: 1}
+  pointsPerHit: 10
+  pointsPerProcessed: 100
+  pointsPerNormalKill: 50
+  pointsPerUltimateKill: 100
+  ultimateKillAlsoScoresNormalKill: 0
+  damageUpgradeBaseCost: 5
+  damageUpgradeCostStep: 5
+  damageUpgradeAmount: 1
+  castSpeedUpgradeBaseCost: 7
+  castSpeedUpgradeCostStep: 5
+  castSpeedUpgradeMultiplier: 1.1
+  healthUpgradeBaseCost: 10
+  healthUpgradeCostStep: 6
+  healthUpgradeAmount: 10
+  maxUpgradeRank: 5
+  sealChipPrice: 25
+  catChipPrice: 30
+  pufferfishChipPrice: 25
+  chipDamageBonus: 2
+  chipStockCapacity: 10
+  shopRestockSeconds: 90
   cash: 0
+  score: 0
   processedStations: 0
   statusMessage: No Process station yet.
+--- !u!114 &198877241
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 198877238}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 49f9bca9aa1d77a4e9918d1b75439584, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: AlienAllIn.Runtime::AlienAllIn.MainCoreGameplayUI
+  runLoop: {fileID: 0}
+  systems: {fileID: 0}
+  board: {fileID: 0}
+  stageCamera: {fileID: 0}
 --- !u!1 &200366912
 GameObject:
   m_ObjectHideFlags: 0
@@ -2047,6 +2177,37 @@ MonoBehaviour:
   lockedColor: {r: 0.055, g: 0.09, b: 0.12, a: 1}
   unlocked: 1
   occupants: []
+--- !u!1 &272644533
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 272644534}
+  m_Layer: 0
+  m_Name: Pickups
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &272644534
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 272644533}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 198877239}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &305879490
 GameObject:
   m_ObjectHideFlags: 0
@@ -6299,7 +6460,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7386895653003618250, guid: e6b3d64900ab3384a9dff495bf4a39db, type: 3}
       propertyPath: countsAsActiveRunMember
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -7746,7 +7907,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7305756046637191110, guid: 5ff06ea13c41a554e9ab4215530a0bdb, type: 3}
       propertyPath: countsAsActiveRunMember
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 7989960612876997347, guid: 5ff06ea13c41a554e9ab4215530a0bdb, type: 3}
       propertyPath: m_Name
@@ -7970,6 +8131,7 @@ MonoBehaviour:
   pickups: []
   state: 0
   elapsedSeconds: 0
+  showLegacyDebugHud: 0
 --- !u!1 &1410197195
 GameObject:
   m_ObjectHideFlags: 0

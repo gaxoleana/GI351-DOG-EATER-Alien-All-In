@@ -13,7 +13,17 @@ namespace AlienAllIn
             BoardGrid board,
             float range,
             float damage,
-            float knockbackDistance)
+            float knockbackDistance) =>
+            ResolveSealAoe(seal, enemies, board, range, damage, knockbackDistance, null);
+
+        public static void ResolveSealAoe(
+            GridActor seal,
+            IEnumerable<GridActor> enemies,
+            BoardGrid board,
+            float range,
+            float damage,
+            float knockbackDistance,
+            Action<GridActor, float> onHit)
         {
             if (!seal || !seal.Alive || enemies == null) return;
 
@@ -23,9 +33,10 @@ namespace AlienAllIn
                 if (!enemy || !enemy.Alive || Vector3.Distance(enemy.transform.position, seal.transform.position) > range)
                     continue;
 
-                float dealt = Mathf.Min(damage, enemy.Health);
-                enemy.Hurt(damage);
+                float dealt = enemy.Hurt(damage);
+                if (dealt <= 0f) continue;
                 seal.AddCharge(dealt);
+                onHit?.Invoke(enemy, dealt);
                 if (!enemy.Alive || !board) continue;
 
                 Vector3 push = (enemy.transform.position - seal.transform.position).normalized * knockbackDistance;

@@ -17,7 +17,7 @@ Players who want a playful strategy and defense game with automated alien behavi
 
 ## Product Purpose
 
-Alien All In is a grid-based idle strategy defense game. Players arrange a team of aliens, start the run, and support their autonomous attacks and activities while enemies interfere. Success means completing the stage's activities before the alien team is eliminated.
+Alien All In is a grid-based idle strategy defense game. Players arrange a team of aliens, start the run, and support their autonomous attacks and activities while enemies interfere. In the current Main prototype, a run ends when its timer expires or all active team members are eliminated; completing a Process station is a reward and does not end the run early.
 
 ## Positioning
 
@@ -26,14 +26,14 @@ The game combines automated alien behavior with tactical placement, activity pro
 ## Operating Context
 
 `Assets/Scenes/Main.unity` is the first enabled Build Settings scene and contains
-the Stage 1 board shell: a 10x10 `BoardGrid`, one world unit per cell, and a 5x5
-opening area. `RunLoopController` provides Placement, Running, Paused,
-RunComplete, and Defeated states, a prototype timer, and reset hooks. Its four
-members are Seal, Cat, Pufferfish, and Duck; Seal and Duck are active run members
-in the Main vertical slice. `TeamPlacementController` supports placement within
-open cells. `MainRunGameplaySystems` uses the RunLoop clock for Casino Process,
-Cash, melee enemies, and Seal combat; final balance values and Process rules
-remain open.
+Stage 1: a 10x10 `BoardGrid`, one world unit per cell, and a 5x5 opening area.
+`RunLoopController` provides Placement, Running, Paused, RunComplete and
+Defeated states, a prototype timer, and reset hooks. Its Seal, Cat, Pufferfish
+and Duck are all active run members. `TeamPlacementController` supports
+Placement; `MainRunGameplaySystems` uses the same RunLoop clock for Process,
+Duck automation, the three fighter combat roles and Ultimate actions, three
+Enemy archetypes, field Items, Cash, Chips, upgrades and Score. GDD gaps and
+temporary prototype values are documented in `GAMEPLAY.md`.
 
 `Assets/Scenes/Gameplay.unity` remains the playable duck + seal reference with
 fixed casino and jump-rope activities, enemies, supplies, Switch relocation,
@@ -43,13 +43,13 @@ and prototype scope.
 ## Capabilities and Constraints
 
 - The GDD names three combat aliens: seal, pufferfish, and cat. A duck supports objectives and collects items.
-- The intended loop is setup, start, autonomous activities and combat, player intervention, and stage victory or defeat.
+- The intended loop is setup, start, autonomous activities and combat, player intervention, resource use, and a timer or team-elimination outcome.
 - The named objectives are casino for duck, darts for pufferfish, and jump rope for seal. The GDD says a stage chooses two of four activities, but names only three; the fourth is undecided.
 - The GDD's first page says 3x3 while later detail pages and the UI say 10x10. The user confirmed 10x10 for this prototype; the final game's board size remains open.
-- Enemy HP is stated as 10. Alien HP, attack cadence, damage, objective duration, enemy pathing, shop prices, and other balance values are not specified and must be labeled as prototype assumptions.
+- Enemy HP is stated as 10. Alien HP, attack cadence, damage, objective duration, enemy pathing, charge rates, shop timing/prices, upgrade and Chip effects, interruption rules, and score tick details are not specified and must be labeled as prototype assumptions.
 - The gambling theme is present, but a betting mechanic is not yet specified.
 - The final game platform, full market/chip rules, and which items are included in the first build are undecided.
-- The Stage 1 scene exposes currently open cells as future Process spawn candidates; it does not implement spawning, type selection, or no-valid-cell handling.
+- The GDD names Casino, Darts and Jump Rope but leaves the fourth activity and station type selection open. Main implements only the three named activities and uses a temporary uniform choice; no-cell Process spawns are skipped until the next roll.
 
 ## Brand Commitments
 
