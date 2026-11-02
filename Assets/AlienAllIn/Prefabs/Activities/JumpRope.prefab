@@ -49,7 +49,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: AlienAllIn.Runtime::AlienAllIn.ActivityStation
   activityKind: 2
   activityName: JUMP ROPE
-  requiredKind: 1
+  requiredKind: 0
   board: {fileID: 0}
   duration: 40
   cashTickSeconds: 1

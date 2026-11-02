@@ -35,16 +35,16 @@ namespace AlienAllIn
                 if (occupant && occupant.Alive && occupant != actor) return false;
             foreach (var order in manualDestinations)
                 if (order.Key != actor && order.Value == destination) return false;
-            // Matching station cells are valid destinations. Only Duck can work the active Casino.
+            // Stations are reserved for Duck; other activities take priority over Casino work.
             foreach (var station in stations)
             {
                 if (!station || station.Cell != destination) continue;
                 if (station == casinoMachine)
                 {
-                    if (actor != duck || !casinoActive || casinoWorker && casinoWorker.Alive && casinoWorker != actor) return false;
+                    if (actor != duck || !casinoActive || CasinoNeedsStationWork || casinoWorker && casinoWorker.Alive && casinoWorker != actor) return false;
                     continue;
                 }
-                if (actor != duck && station.requiredKind != actor.kind) return false;
+                if (actor != duck) return false;
             }
             return true;
         }

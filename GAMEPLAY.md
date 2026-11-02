@@ -34,10 +34,10 @@ on Main Camera controls reserved HUD regions and selection zoom (.88 default).
 - Click a character on the board to open its popup. Play pauses and
   the camera zooms in slightly. **X**, outside click or **Escape** closes it.
   Closing resumes only if opening the popup caused the pause.
-- Drag a character on the board onto an open cell or matching
+- Drag a character on the board onto an open cell, or drag Duck onto a
   station. Placement snaps; during play it walks there without spending charge.
-  Seal works Jump Rope, Pufferfish works Darts, Duck works Casino and other
-  stations, and Cat defends. Occupied/outside/incompatible cells are rejected.
+  Only Duck works stations: Casino, Darts and Jump Rope. The three fighters stay
+  in combat. Occupied/outside/incompatible cells are rejected.
 
 ## Coins, Chips and ATK upgrades
 
@@ -51,20 +51,44 @@ inventories and Chip Shop have been removed. Items and Ultimate gauges remain.
 
 ## Casino machine
 
-Permanent Casino: choose x2/x4/x8 and pay the initial stake. Only Duck works it.
-Check earns Chips; cross loses Chips until the player clicks the machine to
-restore check for free. This replaces the old 20-Coin malfunction repair rule.
-Prototype defaults: tick every 1 second (gain and loss both bet x multiplier), and
-cross roll every 3 staffed seconds at 5%/10%/20% for x2/x4/x8. Cross persists
-across Process cycles until clicked. Rates and intervals are Inspector settings.
-Chip balance cannot fall below zero. Rebet spends another stake and resets Progress.
-Each completed cycle summarizes actual net change, including initial/rebet stake;
-there is no random final payout, duplicate award or automatic next stake charge.
-Normal work bounces with a check thought bubble; cross uses a red cross bubble.
-Actual green signed Chip ticks float above-right, fading in/up/out without a panel.
-Final net counts up with K/M/B abbreviations and multiplier; a positive summary
-flies onto the HUD Chips line. Pause freezes gameplay and visuals. Restart clears
-Casino state and effects. All rates remain prototype balance.
+Click the permanent Casino to choose a stake and x2/x4/x8 multiplier, then press
+Place Bet. Confirming spends the stake once and locks both settings immediately,
+even before Duck starts working. The panel closes after confirmation; if it
+paused a running game, play resumes. Only Duck can work the Casino.
+
+One bet runs for one progress cycle. At 100%, the machine stops and stays at
+100%, with no more Chip ticks or automatic rounds. Click the machine to choose
+and confirm each new stake; repeating the same settings is allowed and charges
+a fresh stake. Editing settings spends nothing; confirmation resets progress to 0%.
+
+All unfinished Darts and Jump Rope stations take priority over the Casino.
+When one spawns during a round, Duck leaves to clear stations before item pickups.
+Casino progress, gain/loss ticks, breakdown checks, stake and multiplier are held.
+Duck must finish every pending station, including any that spawn during the
+detour, then automatically walks back and resumes the same committed round.
+Returning spends no new stake. Capture and nearby enemies still prevent safe
+work. New bets and moves onto the Casino are blocked while stations are pending;
+the panel shows the remaining station count. The existing timed station rolls
+are kept. If no stations exist, Casino play needs no extra work between rounds.
+
+During an active round, the slider, multipliers and Place Bet button are locked.
+The backend also rejects repeat confirmations and rebet/reset requests. Click a
+losing cross machine to fix it for free and continue the same round. Fixing it
+keeps the stake, multiplier, progress, net result and pending Chip tick; it only
+clears the losing state and restarts the breakdown-check interval. The panel also
+offers Fix while losing, or the existing Coin repair action for a fault. Opening a
+locked panel shows the committed stake even if the wallet has dropped below it;
+close the panel to resume gameplay if opening it caused a pause.
+
+The existing prototype payout rules remain: Chip ticks every second, gain/loss
+is stake x multiplier, and a cross-state roll occurs every three staffed seconds
+at 5%/10%/20% for x2/x4/x8. Chip balance cannot fall below zero. Only time actually
+worked before 100% contributes to ticks. The final summary records the actual
+net change, including the stake, once; it does not award a second payout.
+Pause, interruption, Panic or capture stop work without unlocking/resetting the
+round. Restart clears its bet, result and waiting state. Status bubbles and Chip
+feedback stop while the completed machine waits for the next explicit bet.
+
 ## Duck rescue
 
 Duck cannot take HP damage. An enemy reaching and hitting it captures it instead.

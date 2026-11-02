@@ -90,12 +90,16 @@ namespace AlienAllIn.Tests
         }
 
         [UnityTest]
-        public IEnumerator MovingOntoMatchingStationEarnsCoinsWithoutSpendingUltimateGauge()
+        public IEnumerator DuckWorksStationForCoinsWhileFightersCannotBeAssigned()
         {
-            game.DebugSpawnStation(ActivityKind.Casino); var station = game.Stations[0];
-            Assert.That(game.TryOrderMove(game.Seal, station.Cell), Is.True);
+            Assert.That(game.DebugSpawnStation(ActivityKind.JumpRope), Is.True);
+            ActivityStation station = null;
+            foreach (var candidate in game.Stations) if (candidate.activityKind == ActivityKind.JumpRope) station = candidate;
+            Assert.That(station, Is.Not.Null);
+            Assert.That(game.TryOrderMove(game.Seal, station.Cell), Is.False);
+            Assert.That(game.TryOrderMove(game.Duck, station.Cell), Is.True);
             for (int i = 0; i < 200; i++) Call("AdvanceOrdersAndRescue", .05f);
-            Assert.That(game.Seal.CurrentCell, Is.EqualTo(station.Cell));
+            Assert.That(game.Duck.CurrentCell, Is.EqualTo(station.Cell));
             Call("AdvanceProcesses", 2f);
             Assert.That(game.Coins, Is.EqualTo(2)); Assert.That(game.Seal.UltimateCharge, Is.Zero);
             Assert.That(station.Progress, Is.GreaterThan(0));

@@ -202,9 +202,7 @@ namespace AlienAllIn
         {
             if (ShopOpen || CharacterPopupOpen || OptionsOpen || debugPanel && debugPanel.IsOpen ||
                 runLoop.State == RunState.Defeated || runLoop.State == RunState.RunComplete || !systems.CasinoMachine) return;
-            selectedCasinoBet = systems.Chips > 0
-                ? (systems.CasinoActive ? Mathf.Min(systems.CasinoBet, systems.Chips) : 1)
-                : 0;
+            selectedCasinoBet = systems.CasinoActive ? systems.CasinoBet : systems.Chips > 0 ? 1 : 0;
             selectedCasinoMultiplier = systems.CasinoActive ? systems.CasinoMultiplier : 2;
             casinoPanelMode = true;
             ApplyCasinoPanelLayout(true);
@@ -263,26 +261,23 @@ namespace AlienAllIn
 
         void OnCasinoBetSliderChanged(float value)
         {
-            if (!casinoPanelMode || updatingCasinoSlider) return;
+            if (!casinoPanelMode || updatingCasinoSlider || systems.CasinoActive || systems.CasinoNeedsStationWork) return;
             selectedCasinoBet = Mathf.Clamp(Mathf.RoundToInt(value), 0, systems.Chips);
             RefreshUI();
         }
 
         void SelectCasinoMultiplier(int multiplier)
         {
-            if (!casinoPanelMode || systems.CasinoFaulted) return;
+            if (!casinoPanelMode || systems.CasinoFaulted || systems.CasinoActive || systems.CasinoNeedsStationWork) return;
             selectedCasinoMultiplier = multiplier;
             RefreshUI();
         }
 
         void StartOrRepairCasino()
         {
-            if (systems.CasinoActive)
-            {
-                if (systems.CasinoFaulted) systems.TryRepairCasino();
-                else systems.TryChangeCasinoBet(selectedCasinoBet, selectedCasinoMultiplier);
-            }
-            else systems.TryActivateCasino(selectedCasinoBet, selectedCasinoMultiplier);
+            bool accepted = systems.CasinoFaulted ? systems.TryRepairCasino() :
+                systems.CasinoLosing ? systems.TryRecoverCasino() : systems.TryActivateCasino(selectedCasinoBet, selectedCasinoMultiplier);
+            if (accepted) CloseShop();
             RefreshUI();
         }
 
@@ -396,8 +391,8 @@ namespace AlienAllIn
                 if (!station) continue;
                 if (station == systems.CasinoMachine)
                 {
-                    string casinoState = !systems.CasinoActive ? "BET TO START" : systems.CasinoFaulted ? "REPAIR NEEDED" :
-                        systems.CasinoWorker ? $"BET {systems.CasinoBet} · {systems.CasinoWorker.kind}" : $"BET {systems.CasinoBet} · NO WORKER";
+                    string casinoState = systems.CasinoNeedsStationWork ? $"STATIONS FIRST ({systems.PendingStationCount})" : systems.CasinoWaitingForStake ? "COMPLETE - CLICK TO BET" : !systems.CasinoActive ? "BET TO START" : systems.CasinoFaulted ? "REPAIR NEEDED" :
+                        systems.CasinoLosing ? "CLICK TO FIX" : systems.CasinoWorker ? $"BET {systems.CasinoBet} · {systems.CasinoWorker.kind}" : $"BET {systems.CasinoBet} · NO WORKER";
                     list.AppendLine($"CASINO  {station.Progress:P0}  {casinoState}");
                 }
                 else list.AppendLine($"{station.activityName}  {station.Progress:P0}");
@@ -452,7 +447,7 @@ namespace AlienAllIn
                 Vector3 point = stageCamera.ScreenToWorldPoint(new Vector3(screenPosition.x, screenPosition.y, -stageCamera.transform.position.z));
                 if (Vector2.Distance(point, casino.transform.position) <= .55f * board.cellSize)
                 {
-                    if (systems.TryRecoverCasino()) return;
+                    if (systems.TryRecoverCasino()) { RefreshUI(); return; }
                     OpenCasinoPanel();
                     return;
                 }
@@ -550,19 +545,26 @@ namespace AlienAllIn
         {
             shopTitle.text = "CASINO";
             ActivityStation machine = systems.CasinoMachine;
-            selectedCasinoBet = Mathf.Clamp(selectedCasinoBet, 0, systems.Chips);
+            bool locked = systems.CasinoActive;
+            bool needsStation = systems.CasinoNeedsStationWork;
+            if (locked)
+            {
+                selectedCasinoBet = systems.CasinoBet;
+                selectedCasinoMultiplier = systems.CasinoMultiplier;
+            }
+            else selectedCasinoBet = Mathf.Clamp(selectedCasinoBet, 0, systems.Chips);
             if (casinoBetSlider)
             {
                 casinoBetSlider.minValue = 0;
-                casinoBetSlider.maxValue = Mathf.Max(0, systems.Chips);
+                casinoBetSlider.maxValue = locked ? Mathf.Max(systems.Chips, systems.CasinoBet) : Mathf.Max(0, systems.Chips);
                 casinoBetSlider.wholeNumbers = true;
-                casinoBetSlider.interactable = !systems.CasinoFaulted;
+                casinoBetSlider.interactable = !locked && !needsStation;
                 updatingCasinoSlider = true;
                 casinoBetSlider.SetValueWithoutNotify(selectedCasinoBet);
                 updatingCasinoSlider = false;
             }
             if (casinoBetZeroLabel) casinoBetZeroLabel.text = "0";
-            if (casinoBetMaxLabel) casinoBetMaxLabel.text = $"{systems.Chips} Max";
+            if (casinoBetMaxLabel) casinoBetMaxLabel.text = locked || needsStation ? "Locked" : $"{systems.Chips} Max";
 
             for (int i = 0; casinoMultiplierButtons != null && i < casinoMultiplierButtons.Length; i++)
             {
@@ -580,30 +582,26 @@ namespace AlienAllIn
                 if (button.image) button.image.color = multiplier == selectedCasinoMultiplier
                     ? new Color(1f, .43f, .08f, 1f)
                     : new Color(1f, .62f, .32f, 1f);
-                button.interactable = !systems.CasinoFaulted;
+                button.interactable = !locked && !needsStation;
             }
 
-            bool changedBet = systems.CasinoActive &&
-                (selectedCasinoBet != systems.CasinoBet || selectedCasinoMultiplier != systems.CasinoMultiplier);
-            string status = !systems.CasinoActive ? "CHOOSE BET AND MULTIPLIER" : systems.CasinoLosing ? "LOSING - CLICK MACHINE TO RECOVER" :
-                systems.CasinoWaitingForStake ? "WAITING FOR CHIPS" : systems.CasinoWorker ? "DUCK IS PLAYING" : "ACTIVE - SEND DUCK";
-            string betLine = changedBet
-                ? $"Current {systems.CasinoBet} x{systems.CasinoMultiplier}  |  Next {selectedCasinoBet} x{selectedCasinoMultiplier}"
-                : $"Bet {selectedCasinoBet} Chips  x{selectedCasinoMultiplier}";
+            string status = needsStation ? $"STATIONS FIRST ({systems.PendingStationCount})" : locked ?
+                (systems.CasinoFaulted ? "BROKEN / REPAIR" : systems.CasinoLosing ? "LOSING / FIX" : systems.CasinoWorker ? "PLAYING / LOCKED" : "LOCKED / SEND DUCK")
+                : systems.CasinoWaitingForStake ? "COMPLETE - PLACE NEXT BET" : "CHOOSE BET AND MULTIPLIER";
+            if (locked && resumeAfterShop) status += " (close to resume)";
+            string betLine = $"Bet {selectedCasinoBet} Chips  x{selectedCasinoMultiplier}";
             float missChance = systems.GetCasinoMissChance(selectedCasinoMultiplier);
-            shopBalance.text = $"Coins: {systems.Coins}   Chips: {systems.Chips}\n{betLine}   Loss-state chance: {missChance:P0}\nGain +{systems.CasinoGainPerTick:0.#} / Loss -{systems.CasinoLossPerTick:0.#} Chips per {systems.CasinoTickSeconds:0.#}s\nProgress: {(machine ? machine.Progress : 0f):P0}   {status}\nNet this round: {systems.CasinoRoundNet:+0;-0;0} Chips";
+            double gain = systems.GetCasinoGainForBet(selectedCasinoBet, selectedCasinoMultiplier);
+            string netLabel = systems.CasinoWaitingForStake ? "Last round net" : "Net this round";
+            shopBalance.text = $"Coins: {systems.Coins}   Chips: {systems.Chips}\n{betLine}   Loss-state chance: {missChance:P0}\nGain +{gain:0.#} / Loss -{gain:0.#} Chips per {systems.CasinoTickSeconds:0.#}s\nProgress: {(machine ? machine.Progress : 0f):P0}   {status}\n{netLabel}: {systems.CasinoRoundNet:+0;-0;0} Chips";
 
             if (casinoActiveButton)
             {
                 Text label = casinoActiveButton.GetComponentInChildren<Text>(true);
-                if (label) label.text = !systems.CasinoActive ? "Active" : systems.CasinoFaulted
-                    ? $"Repair ({systems.CasinoRepairCoinCost} Coins)"
-                    : systems.CasinoWaitingForStake ? "Place Bet / Reset" : "Active / Rebet";
-                casinoActiveButton.interactable = systems.CasinoActive
-                    ? systems.CasinoFaulted
-                        ? systems.Coins >= systems.CasinoRepairCoinCost
-                        : selectedCasinoBet > 0 && selectedCasinoBet <= systems.Chips && changedBet
-                    : selectedCasinoBet > 0 && selectedCasinoBet <= systems.Chips;
+                if (label) label.text = locked ? (systems.CasinoFaulted ? $"Repair ({systems.CasinoRepairCoinCost})" : systems.CasinoLosing ? "Fix" : "Locked") : needsStation ? "Locked" : "Place Bet";
+                casinoActiveButton.interactable = locked
+                    ? systems.CasinoFaulted ? systems.Coins >= systems.CasinoRepairCoinCost : systems.CasinoLosing
+                    : !needsStation && selectedCasinoBet > 0 && selectedCasinoBet <= systems.Chips;
             }
         }
         internal bool TryDropActor(GridActor actor, Vector2 screenPosition)

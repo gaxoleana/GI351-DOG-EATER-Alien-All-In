@@ -325,7 +325,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: AlienAllIn.Runtime::AlienAllIn.ActivityStation
   activityKind: 1
   activityName: DARTS
-  requiredKind: 4
+  requiredKind: 0
   board: {fileID: 0}
   duration: 32
   cashTickSeconds: 1

@@ -13,7 +13,7 @@ namespace AlienAllIn
         public float cashTickSeconds = 1f;
         [Min(0f), Tooltip("Prototype interval for Processing score ticks. Zero disables Processing score ticks.")]
         public float scoreTickSeconds = 2f;
-        [Tooltip("The Duck can work any species' station as a universal processor.")]
+        [Tooltip("Legacy compatibility field. Station work is restricted to Duck.")]
         public bool allowUniversalDuckWorker = true;
         [Min(0f), Tooltip("Prototype pause applied after an Enemy hits this station or its current worker.")]
         public float interruptionSeconds = 2f;
@@ -33,6 +33,7 @@ namespace AlienAllIn
         public bool Complete => !continuousProgress && progress >= 1;
         public float InterruptionRemaining => interruptionRemaining;
         public GridActor CurrentWorker => currentWorker;
+        public void ReleaseWorker() => currentWorker = null;
         public bool IsInterrupted => interruptionRemaining > 0;
         public Vector2Int Cell { get { board.TryWorldToCell(transform.position, out var cell); return cell; } }
         public void ResetActivity()
@@ -57,8 +58,19 @@ namespace AlienAllIn
         }
 
         public bool AdvanceContinuous(float dt, GridActor worker, float workRate)
+            => AdvanceContinuous(dt, worker, workRate, out _);
+
+        public void FinishCycle()
         {
-            if (dt <= 0f) return false;
+            progress = 1f;
+            currentWorker = null;
+            RefreshView();
+        }
+
+        public bool AdvanceContinuous(float dt, GridActor worker, float workRate, out float workedSeconds)
+        {
+            workedSeconds = 0f;
+            if (dt <= 0f || progress >= 1f) return false;
             if (interruptionRemaining > 0f)
             {
                 interruptionRemaining = Mathf.Max(0f, interruptionRemaining - dt);
@@ -66,7 +78,7 @@ namespace AlienAllIn
                 return false;
             }
 
-            bool eligible = board && worker && worker.Alive && worker.IsOnBoard && worker.CurrentCell == Cell &&
+            bool eligible = board && worker && worker.kind == ActorKind.Duck && worker.Alive && worker.IsOnBoard && worker.CurrentCell == Cell &&
                 Vector3.Distance(worker.transform.position, transform.position) <= .15f * board.cellSize;
             if (!eligible)
             {
@@ -76,8 +88,10 @@ namespace AlienAllIn
 
             currentWorker = worker;
             worker.State = ActorState.Working;
-            float advance = dt * Mathf.Max(.01f, workRate) / Mathf.Max(.01f, duration);
-            progress = Mathf.Repeat(progress + advance, 1f);
+            float rate = Mathf.Max(.01f, workRate), cycleDuration = Mathf.Max(.01f, duration);
+            float remaining = (1f - progress) * cycleDuration / rate;
+            workedSeconds = Mathf.Min(dt, remaining);
+            progress = remaining <= dt ? 1f : progress + dt * rate / cycleDuration;
             RefreshView();
             return true;
         }
@@ -98,8 +112,7 @@ namespace AlienAllIn
                 RefreshView();
                 return 0;
             }
-            bool correctWorker = worker && (worker.kind == requiredKind ||
-                (allowUniversalDuckWorker && worker.kind == ActorKind.Duck));
+            bool correctWorker = worker && worker.kind == ActorKind.Duck;
             if (!board || !correctWorker || !worker.Alive || !worker.IsOnBoard || worker.CurrentCell != Cell)
             {
                 currentWorker = null;

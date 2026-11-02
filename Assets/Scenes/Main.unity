@@ -3675,21 +3675,21 @@ MonoBehaviour:
   processSpawnChance: 0.25
   activitySettings:
   - kind: 0
-    owner: 1
+    owner: 0
     prefab: {fileID: 8277629848444908919, guid: 4552c40286d43244e9f6a76af3e20b3f, type: 3}
     durationSeconds: 36
     cashTickSeconds: 1
     processScoreTickSeconds: 2
     markerColor: {r: 0.92, g: 0.67, b: 0.28, a: 1}
   - kind: 1
-    owner: 4
+    owner: 0
     prefab: {fileID: 3010998010790943494, guid: 2ba8580e4fe765d49aef923206562f46, type: 3}
     durationSeconds: 32
     cashTickSeconds: 1
     processScoreTickSeconds: 2
     markerColor: {r: 0.45, g: 0.78, b: 0.98, a: 1}
   - kind: 2
-    owner: 1
+    owner: 0
     prefab: {fileID: 2579694524074495010, guid: aabea677917e6614c86db6bc20d3634e, type: 3}
     durationSeconds: 40
     cashTickSeconds: 1

@@ -23,6 +23,7 @@ namespace AlienAllIn
         public long CasinoRoundNet => casinoRoundNet;
         public double CasinoGainPerTick => CasinoBet * (double)casinoGainPerBetChip * CasinoMultiplier;
         public double CasinoLossPerTick => CasinoGainPerTick;
+        public double GetCasinoGainForBet(int amount, int multiplier) => Mathf.Max(0, amount) * (double)casinoGainPerBetChip * multiplier;
         public float CasinoTickSeconds => Mathf.Max(.1f, casinoChipTickSeconds);
         public event System.Action<long> CasinoChipTick;
 
@@ -33,6 +34,7 @@ namespace AlienAllIn
         bool casinoActive;
         bool casinoFaulted;
         bool casinoWaitingForStake;
+        bool casinoReturnAfterStations;
         string casinoLastResult = "READY";
         static readonly int[] casinoMultiplierOptions = { 2, 4, 8 };
 
@@ -44,6 +46,17 @@ namespace AlienAllIn
         public bool CasinoActive => casinoActive;
         public bool CasinoFaulted => casinoFaulted;
         public bool CasinoWaitingForStake => casinoWaitingForStake;
+        public bool CasinoNeedsStationWork => PendingStationCount > 0;
+        public int PendingStationCount
+        {
+            get
+            {
+                int count = 0;
+                foreach (ActivityStation station in stations)
+                    if (station && station != casinoMachine && !station.Complete) count++;
+                return count;
+            }
+        }
         public string CasinoLastResult => casinoLastResult;
         public event System.Action<long, int> CasinoRoundResolved;
         public static int CasinoMultiplierCount => casinoMultiplierOptions.Length;
@@ -142,6 +155,7 @@ namespace AlienAllIn
             casinoWorker = null;
             casinoFaultClock = 0f;
             casinoWaitingForStake = false;
+            casinoReturnAfterStations = false;
             casinoLastResult = "READY";
             ResetCasinoTickState(0);
             if (!casinoMachine) return;
@@ -155,8 +169,18 @@ namespace AlienAllIn
 
         public bool TryActivateCasino(int betAmount, int multiplier)
         {
-            if (!casinoMachine || casinoActive || !runLoop ||
+            if (casinoActive)
+            {
+                SetStatusFromUI("Casino round in progress. Bet and multiplier are locked until 100%.");
+                return false;
+            }
+            if (!casinoMachine || !runLoop ||
                 runLoop.State == RunState.RunComplete || runLoop.State == RunState.Defeated) return false;
+            if (CasinoNeedsStationWork)
+            {
+                SetStatusFromUI("Duck must finish all other stations before playing the Casino.");
+                return false;
+            }
             if (betAmount < 1 || betAmount > chips)
             {
                 SetStatusFromUI("Choose a Casino bet between 1 Chip and your available Chips.");
@@ -181,30 +205,12 @@ namespace AlienAllIn
 
         public bool TryChangeCasinoBet(int betAmount, int multiplier)
         {
-            if (!casinoMachine || !casinoActive || casinoFaulted || !runLoop ||
-                runLoop.State == RunState.RunComplete || runLoop.State == RunState.Defeated) return false;
-            if (betAmount < 1 || betAmount > chips)
+            if (casinoActive)
             {
-                SetStatusFromUI("Choose a new Casino bet between 1 Chip and your available Chips.");
+                SetStatusFromUI("Finish the current Casino round before placing another bet.");
                 return false;
             }
-            if (!IsCasinoMultiplier(multiplier)) return false;
-            if (betAmount == CasinoBet && multiplier == CasinoMultiplier)
-            {
-                SetStatusFromUI("Choose a different bet or multiplier to reset Progress.");
-                return false;
-            }
-
-            chips -= betAmount;
-            ResetCasinoTickState(-betAmount);
-            CasinoBet = betAmount;
-            CasinoMultiplier = multiplier;
-            casinoFaultClock = 0f;
-            casinoWaitingForStake = false;
-            casinoLastResult = $"NEW BET PLACED - {betAmount} Chips on x{multiplier}";
-            casinoMachine.ResetActivity();
-            SetStatusFromUI($"Casino bet changed to {betAmount} Chips on x{multiplier}. Progress reset to 0%.");
-            return true;
+            return TryActivateCasino(betAmount, multiplier);
         }
 
         public bool TryRepairCasino()
@@ -228,23 +234,22 @@ namespace AlienAllIn
         void AdvanceCasino(float dt)
         {
             if (!casinoMachine || !casinoActive || casinoFaulted) return;
+            if (CasinoNeedsStationWork) { SuspendCasinoForStations(); return; }
             if (casinoWorker && (!casinoWorker.Alive || casinoWorker == duck && DuckCaptured)) casinoWorker = null;
             if (casinoWorker && casinoWorker.State == ActorState.Panic) return;
 
             float workRate = GetProcessingRate(casinoWorker);
-            bool roundComplete = casinoMachine.Progress + dt * Mathf.Max(.01f, workRate) /
-                Mathf.Max(.01f, casinoMachine.duration) >= 1f;
-            bool worked = casinoMachine.AdvanceContinuous(dt, casinoWorker, workRate);
+            bool worked = casinoMachine.AdvanceContinuous(dt, casinoWorker, workRate, out float workSeconds);
             if (!worked) return;
 
-            if (casinoWorker == duck) duck.AddUltimateCharge(duckProcessChargePerSecond * dt);
-            casinoLossClock += dt;
+            if (casinoWorker == duck) duck.AddUltimateCharge(duckProcessChargePerSecond * workSeconds);
+            casinoLossClock += workSeconds;
             while (casinoLossClock >= Mathf.Max(.1f, casinoLossCheckSeconds))
             {
                 casinoLossClock -= Mathf.Max(.1f, casinoLossCheckSeconds);
                 if (!casinoLosing && UnityEngine.Random.value < GetCasinoMissChance(CasinoMultiplier)) casinoLosing = true;
             }
-            casinoTickClock += dt;
+            casinoTickClock += workSeconds;
             while (casinoTickClock >= Mathf.Max(.1f, casinoChipTickSeconds))
             {
                 casinoTickClock -= Mathf.Max(.1f, casinoChipTickSeconds);
@@ -257,16 +262,21 @@ namespace AlienAllIn
                 CasinoChipTick?.Invoke(actual);
                 RunDataChanged?.Invoke();
             }
-            if (roundComplete) ResolveCasinoRound();
+            if (casinoMachine.Progress >= 1f) ResolveCasinoRound();
         }
 
         void ResolveCasinoRound()
         {
             long result = casinoRoundNet;
             casinoLastResult = $"NET {result:+0;-0;0} CHIPS (x{CasinoMultiplier})";
-            statusMessage = casinoLastResult;
-            casinoMachine.ResetActivity();
-            casinoRoundNet = 0;
+            casinoActive = false;
+            casinoWaitingForStake = true;
+            casinoReturnAfterStations = false;
+            casinoLosing = false;
+            if (casinoWorker && casinoWorker.State == ActorState.Working) casinoWorker.State = ActorState.Idle;
+            casinoWorker = null;
+            casinoMachine.FinishCycle();
+            statusMessage = $"{casinoLastResult}. Round complete — click the Casino to place the next bet.";
             RunDataChanged?.Invoke();
             CasinoRoundResolved?.Invoke(result, CasinoMultiplier);
         }
@@ -278,12 +288,25 @@ namespace AlienAllIn
             casinoRoundNet = initialNet;
         }
 
+        void SuspendCasinoForStations()
+        {
+            if (!casinoActive) return;
+            casinoReturnAfterStations = true;
+            if (casinoWorker == duck && duck.State == ActorState.Working) duck.State = ActorState.Idle;
+            casinoWorker = null;
+            casinoMachine.ReleaseWorker();
+            if (manualDestinations.TryGetValue(duck, out Vector2Int destination) && destination == casinoMachine.Cell)
+                manualDestinations.Remove(duck);
+        }
+
         public bool TryRecoverCasino()
         {
-            if (!casinoActive || !casinoLosing || !runLoop || runLoop.State != RunState.Running) return false;
+            if (!casinoMachine || !casinoActive || !casinoLosing || casinoFaulted || !runLoop ||
+                runLoop.State == RunState.RunComplete || runLoop.State == RunState.Defeated) return false;
+
             casinoLosing = false;
-            casinoLossClock = casinoTickClock = 0;
-            SetStatusFromUI("Casino recovered. Chips are increasing again.");
+            casinoLossClock = 0f;
+            SetStatusFromUI("Casino fixed. The current bet and progress continue.");
             return true;
         }
 

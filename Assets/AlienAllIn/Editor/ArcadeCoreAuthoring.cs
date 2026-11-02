@@ -22,9 +22,9 @@ namespace AlienAllIn.Editor
             AssetDatabase.Refresh();
             material = AssetDatabase.LoadAssetAtPath<Material>("Assets/AlienAllIn/Art/UnlitSprites.mat");
             square = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/AlienAllIn/Art/Square.png");
-            var casino = CreateStation("ArcadeCasino", "CASINO", ActivityKind.Casino, ActorKind.Seal, 36, Import("StationCasino", .88f));
-            var darts = CreateStation("Darts", "DARTS", ActivityKind.Darts, ActorKind.Pufferfish, 32, Import("StationDarts", .88f));
-            var rope = CreateStation("JumpRope", "JUMP ROPE", ActivityKind.JumpRope, ActorKind.Seal, 40, Import("StationJumpRope", .88f));
+            var casino = CreateStation("ArcadeCasino", "CASINO", ActivityKind.Casino, 36, Import("StationCasino", .88f));
+            var darts = CreateStation("Darts", "DARTS", ActivityKind.Darts, 32, Import("StationDarts", .88f));
+            var rope = CreateStation("JumpRope", "JUMP ROPE", ActivityKind.JumpRope, 40, Import("StationJumpRope", .88f));
             var roaster = CreateEnemy("Roaster", Import("EnemyRoaster", .88f));
             var toaster = CreateEnemy("Toaster", Import("EnemyToaster", .88f));
             var pan = CreateEnemy("PanShield", Import("EnemyPan", .88f));
@@ -98,11 +98,11 @@ namespace AlienAllIn.Editor
             return AssetDatabase.LoadAssetAtPath<Sprite>(path);
         }
 
-        static ActivityStation CreateStation(string file, string label, ActivityKind kind, ActorKind owner, float duration, Sprite sprite)
+        static ActivityStation CreateStation(string file, string label, ActivityKind kind, float duration, Sprite sprite)
         {
             var root = new GameObject(file);
             var station = root.AddComponent<ActivityStation>();
-            station.activityName = label; station.activityKind = kind; station.requiredKind = owner;
+            station.activityName = label; station.activityKind = kind; station.requiredKind = ActorKind.Duck;
             station.duration = duration;
             station.artwork = Renderer("Artwork", root.transform, sprite, new Vector3(0, .12f), Vector3.one, Color.white, 2);
             Renderer("Progress Track", root.transform, square, new Vector3(0, -.46f), new Vector3(.82f, .055f, 1), new Color(.25f, .25f, .25f), 4);

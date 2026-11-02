@@ -141,7 +141,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: AlienAllIn.Runtime::AlienAllIn.ActivityStation
   activityKind: 0
   activityName: CASINO
-  requiredKind: 1
+  requiredKind: 0
   board: {fileID: 0}
   duration: 36
   cashTickSeconds: 1

@@ -41,7 +41,7 @@ namespace AlienAllIn.Tests
                 Assert.That(prefab.artwork, Is.Not.Null);
                 Assert.That(prefab.progressFill, Is.Not.Null);
                 Assert.That(prefab.allowUniversalDuckWorker, Is.True);
-                Assert.That(prefab.requiredKind, Is.EqualTo(prefab.activityKind == ActivityKind.Darts ? ActorKind.Pufferfish : ActorKind.Seal));
+                Assert.That(prefab.requiredKind, Is.EqualTo(ActorKind.Duck));
                 Assert.That(prefab.artwork.sprite.texture.filterMode, Is.EqualTo(FilterMode.Point));
                 stationSprites.Add(prefab.artwork.sprite);
             }

@@ -94,3 +94,12 @@ and prototype scope.
 - Aliens can make progress automatically, while the player still has useful moments to intervene.
 - Objectives, combat, and rewards should produce clear feedback.
 - Humor should coexist with real strategic choices.
+
+The permanent Casino uses one confirmed stake per progress cycle. Bet and
+multiplier lock on confirmation. At 100% it stops until the player clicks the
+machine and confirms a new stake. Mid-round rebetting is blocked. Clicking a
+broken machine fixes it while preserving the committed round. There is no
+automatic repeat round. Only Duck works stations. All unfinished non-Casino
+stations take priority: Duck clears them before returning to resume an interrupted
+Casino round, keeping its stake, multiplier and progress. There is no extra
+station requirement when none are pending.

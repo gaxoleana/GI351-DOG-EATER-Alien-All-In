@@ -32,9 +32,9 @@ namespace AlienAllIn
         [SerializeField, Range(0f, 1f)] float processSpawnChance = .25f;
         [SerializeField] ActivityPrototypeSettings[] activitySettings =
         {
-            new ActivityPrototypeSettings { kind = ActivityKind.Casino, owner = ActorKind.Seal, durationSeconds = 36f, cashTickSeconds = 1f, processScoreTickSeconds = 2f, markerColor = new Color(.92f, .67f, .28f, 1f) },
-            new ActivityPrototypeSettings { kind = ActivityKind.Darts, owner = ActorKind.Pufferfish, durationSeconds = 32f, cashTickSeconds = 1f, processScoreTickSeconds = 2f, markerColor = new Color(.45f, .78f, .98f, 1f) },
-            new ActivityPrototypeSettings { kind = ActivityKind.JumpRope, owner = ActorKind.Seal, durationSeconds = 40f, cashTickSeconds = 1f, processScoreTickSeconds = 2f, markerColor = new Color(.63f, .93f, .64f, 1f) }
+            new ActivityPrototypeSettings { kind = ActivityKind.Casino, owner = ActorKind.Duck, durationSeconds = 36f, cashTickSeconds = 1f, processScoreTickSeconds = 2f, markerColor = new Color(.92f, .67f, .28f, 1f) },
+            new ActivityPrototypeSettings { kind = ActivityKind.Darts, owner = ActorKind.Duck, durationSeconds = 32f, cashTickSeconds = 1f, processScoreTickSeconds = 2f, markerColor = new Color(.45f, .78f, .98f, 1f) },
+            new ActivityPrototypeSettings { kind = ActivityKind.JumpRope, owner = ActorKind.Duck, durationSeconds = 40f, cashTickSeconds = 1f, processScoreTickSeconds = 2f, markerColor = new Color(.63f, .93f, .64f, 1f) }
         };
         [SerializeField, Range(1f, 2f)] float duckProcessingMultiplier = 1.1f;
         [SerializeField, Range(0f, 1f)] float duckUltimateProcessBonus = .15f;
@@ -277,7 +277,7 @@ namespace AlienAllIn
             station.name = $"{settings.kind.ToString().ToUpperInvariant()} {stations.Count + 1:00}";
             station.activityKind = settings.kind;
             station.activityName = ActivityLabel(settings.kind);
-            station.requiredKind = settings.owner;
+            station.requiredKind = ActorKind.Duck;
             station.board = board;
             station.duration = Mathf.Max(1f, settings.durationSeconds);
             station.cashTickSeconds = Mathf.Max(.05f, settings.cashTickSeconds);
@@ -288,6 +288,7 @@ namespace AlienAllIn
             station.ResetActivity();
             if (station.marker) station.marker.color = settings.markerColor;
             stations.Add(station);
+            SuspendCasinoForStations();
             statusMessage = $"{station.activityName} spawned at {boardCell.Address}.";
             RunDataChanged?.Invoke();
             return true;
@@ -386,11 +387,20 @@ namespace AlienAllIn
         void TickDuck(float dt)
         {
             if (!duck || !duck.Alive) return;
+            bool stationsPending = CasinoNeedsStationWork;
+            if (stationsPending) SuspendCasinoForStations();
             if (DuckCaptured || manualDestinations.ContainsKey(duck)) return;
 
             duck.RefreshCell();
-            bool onCasino = casinoMachine && casinoActive && duck.IsOnBoard && duck.CurrentCell == casinoMachine.Cell;
-            if (onCasino && (!casinoWorker || casinoWorker == duck))
+            if (stationsPending && duck.State == ActorState.Panic && !IsEnemyNearDuckForWork()) duck.State = ActorState.Idle;
+            if (casinoMachine && casinoWaitingForStake && !stationsPending && duck.IsOnBoard && duck.CurrentCell == casinoMachine.Cell)
+            {
+                duck.State = IsEnemyNearDuckForWork() ? ActorState.Panic : ActorState.Idle;
+                return;
+            }
+            bool onCasino = casinoMachine && casinoActive && !stationsPending && duck.IsOnBoard && duck.CurrentCell == casinoMachine.Cell;
+            bool returningToCasino = casinoActive && casinoReturnAfterStations && !stationsPending;
+            if ((onCasino || returningToCasino) && (!casinoWorker || casinoWorker == duck))
             {
                 if (IsEnemyNearDuckForWork())
                 {
@@ -407,6 +417,7 @@ namespace AlienAllIn
                     return;
                 }
                 duck.State = ActorState.Working;
+                casinoReturnAfterStations = false;
                 if (recovering) SetStatusFromUI("Duck is safe and resumed Casino work.");
                 return;
             }
@@ -461,7 +472,8 @@ namespace AlienAllIn
 
         void TickDuckMovementAndWork(float dt)
         {
-            FieldPickup item = FindNearestAvailableItem(duck.transform.position);
+            ActivityStation station = FindNearestIncompleteStation(duck.transform.position);
+            FieldPickup item = station ? null : FindNearestAvailableItem(duck.transform.position);
             if (item)
             {
                 duck.State = ActorState.Collecting;
@@ -479,7 +491,6 @@ namespace AlienAllIn
                 return;
             }
 
-            ActivityStation station = FindNearestIncompleteStation(duck.transform.position);
             if (!station)
             {
                 duck.State = duck.IsUltimateActive ? ActorState.UsingUltimate : ActorState.Idle;
@@ -543,11 +554,9 @@ namespace AlienAllIn
         {
             if (!station) return null;
             if (station == casinoMachine)
-                return casinoActive && !casinoFaulted && !(casinoWorker == duck && DuckCaptured) && IsStandingAt(casinoWorker, station) &&
+                return casinoActive && !CasinoNeedsStationWork && !casinoFaulted && !(casinoWorker == duck && DuckCaptured) && IsStandingAt(casinoWorker, station) &&
                     casinoWorker.State != ActorState.Panic ? casinoWorker : null;
-            GridActor owner = GetActor(station.requiredKind);
-            if (IsStandingAt(owner, station)) return owner;
-            if (!DuckCaptured && station.allowUniversalDuckWorker && IsStandingAt(duck, station) && duck.State != ActorState.Panic)
+            if (!DuckCaptured && IsStandingAt(duck, station) && duck.State != ActorState.Panic)
                 return duck;
             return null;
         }

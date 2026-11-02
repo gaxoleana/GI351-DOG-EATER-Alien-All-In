@@ -168,7 +168,7 @@ namespace AlienAllIn
                 artworkBasePosition = art.localPosition;
                 artworkBaseScale = art.localScale;
             }
-            bool working = systems.CasinoActive && !systems.CasinoFaulted && !systems.CasinoWaitingForStake &&
+            bool working = systems.CasinoActive && !systems.CasinoNeedsStationWork && !systems.CasinoFaulted && !systems.CasinoWaitingForStake &&
                 machine.CurrentWorker && machine.CurrentWorker.Alive && machine.CurrentWorker.State == ActorState.Working && !machine.IsInterrupted;
             UpdateCasinoThought(machine, working);
             for (int i = casinoTickVisuals.Count - 1; i >= 0; i--)

@@ -395,39 +395,9 @@ namespace AlienAllIn
 
         void TickTeamCombat(float dt)
         {
-            if (seal && seal.Alive && !manualDestinations.ContainsKey(seal) && !TickOwnerProcess(seal, dt)) TickSeal(dt);
-            if (cat && cat.Alive && !manualDestinations.ContainsKey(cat) && !TickOwnerProcess(cat, dt)) TickCat(dt);
-            if (pufferfish && pufferfish.Alive && !manualDestinations.ContainsKey(pufferfish) && !TickOwnerProcess(pufferfish, dt)) TickPufferCombatState(dt);
-        }
-
-        bool TickOwnerProcess(GridActor actor, float dt)
-        {
-            ActivityStation assigned = null;
-            float nearest = float.PositiveInfinity;
-            foreach (ActivityStation station in stations)
-            {
-                if (!station || station.Complete) continue;
-                if (station == casinoMachine)
-                {
-                    if (casinoActive && casinoWorker == actor && IsStandingAt(actor, station))
-                    {
-                        if (!casinoFaulted && actor.State != ActorState.Panic) actor.State = ActorState.Working;
-                        return true;
-                    }
-                    continue;
-                }
-                if (station.requiredKind != actor.kind) continue;
-                float distance = (station.transform.position - actor.transform.position).sqrMagnitude;
-                if (distance >= nearest) continue;
-                nearest = distance;
-                assigned = station;
-            }
-            if (!assigned) return false;
-            if (actor.IsUltimateActive) return false;
-            if (Vector3.Distance(actor.transform.position, assigned.transform.position) > .15f * board.cellSize) return false;
-            if (actor == pufferfish) ResetPufferCycle();
-            actor.State = ActorState.Working;
-            return true;
+            if (seal && seal.Alive && !manualDestinations.ContainsKey(seal)) TickSeal(dt);
+            if (cat && cat.Alive && !manualDestinations.ContainsKey(cat)) TickCat(dt);
+            if (pufferfish && pufferfish.Alive && !manualDestinations.ContainsKey(pufferfish)) TickPufferCombatState(dt);
         }
 
         void TickSeal(float dt)
