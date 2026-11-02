@@ -43,6 +43,8 @@ namespace AlienAllIn
         [SerializeField, Min(0f)] float pointsPerProcessingTick = 5f;
 
         [Header("Prototype Duck behaviour")]
+        [SerializeField, Min(0f), Tooltip("Duck resumes Casino work when no living enemy is within this many cells.")]
+        float duckWorkSafetyRadiusCells = 2f;
         [SerializeField, Min(0f)] float duckPanicChargePerSecond = .04f;
         [SerializeField, Min(0f)] float duckProcessChargePerSecond = .025f;
         [SerializeField, Min(0f)] float duckItemCharge = .15f;
@@ -61,10 +63,8 @@ namespace AlienAllIn
         [SerializeField, Min(0f)] float sealRippleKnockback = 1.4f;
         [SerializeField, Min(0f)] float catStunSeconds = 1f;
         [SerializeField, Min(.1f)] float catLaserDurationSeconds = 4f;
-        [SerializeField, Min(.1f)] float catLaserRevolutions = 2f;
         [SerializeField, Min(.1f)] float catLaserHitIntervalSeconds = .5f;
         [SerializeField, Min(0f)] float catLaserDamage = 1.5f;
-        [SerializeField, Range(1f, 180f)] float catLaserArcDegrees = 35f;
         [SerializeField, Min(.1f)] float pufferInflateSeconds = .55f;
         [SerializeField, Min(.1f)] float pufferFloatSeconds = 3.5f;
         [SerializeField, Min(.1f)] float pufferFloatSpeed = 1.12f;
@@ -388,22 +388,29 @@ namespace AlienAllIn
             if (!duck || !duck.Alive) return;
             if (DuckCaptured || manualDestinations.ContainsKey(duck)) return;
 
-            if (casinoWorker == duck)
+            duck.RefreshCell();
+            bool onCasino = casinoMachine && casinoActive && duck.IsOnBoard && duck.CurrentCell == casinoMachine.Cell;
+            if (onCasino && (!casinoWorker || casinoWorker == duck))
             {
-                if (IsDuckTargetedByEnemy())
+                if (IsEnemyNearDuckForWork())
                 {
                     duck.State = ActorState.Panic;
                     duck.AddUltimateCharge(duckPanicChargePerSecond * dt);
                     return;
                 }
-                if (duck.State == ActorState.Panic)
+                bool recovering = duck.State == ActorState.Panic;
+                casinoWorker = duck;
+                if (!IsStandingAt(duck, casinoMachine))
                 {
-                    duck.AddUltimateCharge(duckPanicChargePerSecond * dt);
+                    duck.State = ActorState.Moving;
+                    MoveActorAlongGrid(duck, casinoMachine.transform.position, dt, 1f);
                     return;
                 }
                 duck.State = ActorState.Working;
+                if (recovering) SetStatusFromUI("Duck is safe and resumed Casino work.");
                 return;
             }
+            if (casinoWorker == duck) casinoWorker = null;
 
             if (duck.UltimateFull && !duck.IsUltimateActive)
             {
@@ -437,6 +444,19 @@ namespace AlienAllIn
             }
 
             TickDuckMovementAndWork(dt);
+        }
+
+        bool IsEnemyNearDuckForWork()
+        {
+            Vector3 origin = board.transform.InverseTransformPoint(duck.transform.position);
+            float radius = duckWorkSafetyRadiusCells * board.cellSize;
+            foreach (var enemy in enemies)
+            {
+                if (!enemy || !enemy.Alive || !enemy.gameObject.activeInHierarchy) continue;
+                Vector3 position = board.transform.InverseTransformPoint(enemy.transform.position);
+                if ((position - origin).sqrMagnitude <= radius * radius) return true;
+            }
+            return false;
         }
 
         void TickDuckMovementAndWork(float dt)

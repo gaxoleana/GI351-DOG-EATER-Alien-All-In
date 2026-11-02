@@ -69,17 +69,18 @@ namespace AlienAllIn
             if (selected.kind == ActorKind.Duck) return;
             board.TryWorldToCell(selected.transform.position, out var center);
             float radius = systems.GetAttackPreviewRadius(selected);
-            bool gridRange = selected.kind == ActorKind.Seal;
+            bool gridRange = selected.kind == ActorKind.Seal || selected.kind == ActorKind.Cat;
             foreach (var cell in board.GetComponentsInChildren<BoardCell>())
             {
                 if (!cell.IsUnlocked) continue;
-                bool inRange = gridRange
-                    ? SealGridRange.Contains(cell.coordinate - center, selected.IsUltimateActive)
+                bool inRange = selected.kind == ActorKind.Cat
+                    ? selected.IsUltimateActive || CatAttackRange.Contains(cell.coordinate - center)
+                    : gridRange ? SealGridRange.Contains(cell.coordinate - center, selected.IsUltimateActive)
                     : Vector3.Distance(board.CellCenter(cell.coordinate), selected.transform.position) <= radius;
                 if (inRange) { Paint(cell, rangeColor); RangeCellCount++; }
             }
             if (gridRange) return;
-            // A world-space circle matches the distance checks used for Cat and Puffer targeting.
+            // Puffer's lock-on range still uses a world-space distance check.
             dragOutline.enabled = true;
             dragOutline.loop = true;
             dragOutline.positionCount = 64;

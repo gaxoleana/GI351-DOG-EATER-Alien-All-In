@@ -12,6 +12,8 @@ namespace AlienAllIn
         const int CasinoResultFontSize = 20;
 
         [Header("Casino visual prototype")]
+        [SerializeField, Range(.5f, 1.25f), Tooltip("Size of the slot-machine status bubble, including its symbol and dots.")]
+        float casinoStatusVisualScale = .8f;
         [SerializeField, Min(.1f)] float casinoBounceFrequency = 2.5f;
         [SerializeField, Range(0f, .3f)] float casinoBounceAmount = .10f;
         [SerializeField, Min(.1f)] float casinoResultCountSeconds = .65f;
@@ -321,6 +323,7 @@ namespace AlienAllIn
             var go = new GameObject("Casino thought bubble",typeof(RectTransform),typeof(CanvasRenderer),typeof(Image));
             go.transform.SetParent(hudCanvas.transform,false);
             casinoThought=go.GetComponent<RectTransform>(); casinoThought.anchorMin=casinoThought.anchorMax=new Vector2(.5f,.5f); casinoThought.sizeDelta=new Vector2(54,42);
+            casinoThought.localScale=Vector3.one*casinoStatusVisualScale;
             go.GetComponent<Image>().sprite=thoughtSprite; go.GetComponent<Image>().raycastTarget=false;
             for(int i=0;i<2;i++)
             {

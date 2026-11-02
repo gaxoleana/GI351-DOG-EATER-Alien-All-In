@@ -16,6 +16,7 @@ namespace AlienAllIn
         public bool DuckCaptured => duckCaptor && duckCaptor.Alive;
         public float DuckRescueRemaining => duckRescueRemaining;
         public int DuckRansomChips => duckRansomChips;
+        public float DuckRescueDuration => duckRescueSeconds;
 
         void ResetOrdersAndRescue()
         {

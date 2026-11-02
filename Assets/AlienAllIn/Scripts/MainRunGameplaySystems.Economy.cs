@@ -102,7 +102,7 @@ namespace AlienAllIn
             itemInventory[index] += Mathf.Max(1, quantity);
         }
 
-        public bool TryUseItem(FieldItemKind item, GridActor target)
+        public bool CanUseItem(FieldItemKind item, GridActor target)
         {
             if (!runLoop || runLoop.State != RunState.Running || !target || !target.Alive || itemInventory[ItemIndex(item)] <= 0) return false;
             ActorKind required = item switch
@@ -111,7 +111,11 @@ namespace AlienAllIn
                 FieldItemKind.LaserGun => ActorKind.Cat,
                 _ => ActorKind.Seal
             };
-            if (target.kind != required || !target.UltimateFull) return false;
+            return target.kind == required && target.UltimateFull;
+        }
+        public bool TryUseItem(FieldItemKind item, GridActor target)
+        {
+            if(!CanUseItem(item,target)) return false;
             if (!ActivateUltimate(target)) return false;
             itemInventory[ItemIndex(item)]--;
             statusMessage = $"{item} used by {target.kind}.";

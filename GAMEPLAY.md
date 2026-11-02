@@ -228,3 +228,38 @@ Keyboard O retains the debug tools. Hover a board character for
 an outline. Drag a character to see the destination cell highlighted green when
 valid and red when blocked; leaving the board or ending the drag clears it.
 Seal's Inspector gizmo also uses the normal grid-cell mask in Main.
+
+
+## Character gauges and Cat reference attacks
+
+Main saves `Character Status Bars` under its HUD Canvas. Two thin green HP and yellow Ultimate bars follow each fighter, sized to the
+visible cells as the board expands. They use no text, percentage, glow or
+ready-state color change. The stack is five HUD-reference pixels high. Bars do not intercept
+pointer clicks and stay inside the board viewport. Duck has an Ultimate bar but
+no HP bar; while captured, its upper bar shows the remaining rescue time as a fill.
+The bar colors, width limits and offset are editable on each CharacterStatusBar.
+
+Items require a collected copy, a living matching fighter, a full Ultimate gauge
+and Running state. Item buttons are disabled until these conditions are met.
+Using one spends one item and the full gauge. Opening a popup pauses the game,
+so close it before activating an item.
+
+Cat's normal attack uses the reference's 21-cell mask (5x5 excluding corners),
+and fires a straight laser at the nearest enemy in those cells. Cat's Ultimate
+hits every living enemy on the active board on its existing damage cadence for
+five shots. Each Ultimate attack tick fires eight short rays horizontally, vertically and
+diagonally to the board edges. A shot flashes for 0.14 seconds, matching the normal
+laser, then switches off between ticks. The Ultimate fires exactly five shots at its existing 0.5-second cadence,
+then ends after the last short flash. Shots follow Cat, resize on expansion/shrink and
+freeze while paused. They indicate the
+whole-board effect; an enemy does not have to stand on a ray to take damage.
+The saved beam objects are under `Attack VFX > Cat Ultimate - Eight Board Lasers`.
+The preview on selection uses the same cell mask/whole-board targeting rules.
+
+
+Duck recovers automatically from Casino Panic when it remains on the machine's
+cell and no living enemy is within the work-safety radius (default: two cells).
+It recenters on the machine if needed and resumes the existing bet and progress;
+no drag or reactivation is needed. Dead enemies and distant enemies targeting
+Duck do not block recovery. Captured Duck still needs rescue. Tune the radius
+with Duck Work Safety Radius Cells on MainRunGameplaySystems.

@@ -274,6 +274,12 @@ namespace AlienAllIn
             if (TryGetComponent(out AlienAnimationDriver animationDriver)) animationDriver.PlayUltimate();
         }
 
+        public void EndUltimate()
+        {
+            ultimateRemaining = 0;
+            if (state == ActorState.UsingUltimate) state = ActorState.Idle;
+        }
+
         public void AdvanceRuntime(float dt)
         {
             if (dt <= 0f) return;
@@ -342,14 +348,14 @@ namespace AlienAllIn
         void OnDrawGizmosSelected()
         {
             if (kind == ActorKind.Duck) return;
-            if (kind == ActorKind.Seal && useGridAttackRange && board)
+            if ((kind == ActorKind.Seal || kind == ActorKind.Cat) && useGridAttackRange && board)
             {
                 board.TryWorldToCell(transform.position, out var center);
                 Gizmos.color = new Color(1, .6f, .1f, .7f);
                 for (int y=-2;y<=2;y++) for (int x=-2;x<=2;x++)
                 {
                     var offset = new Vector2Int(x,y); var cell = center + offset;
-                    if (SealGridRange.Contains(offset) && board.Contains(cell))
+                    if ((kind == ActorKind.Cat ? CatAttackRange.Contains(offset) : SealGridRange.Contains(offset)) && board.Contains(cell))
                         Gizmos.DrawWireCube(board.CellCenter(cell), board.transform.TransformVector(Vector3.one * board.cellSize * .96f));
                 }
                 return;

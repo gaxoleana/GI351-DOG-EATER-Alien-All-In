@@ -405,7 +405,11 @@ namespace AlienAllIn
             processText.text = list.ToString();
             if (enemyStatusText) enemyStatusText.text = $"Enemy\n{systems.Enemies.Count}";
             for (int i = 0; i < itemButtons.Length; i++)
+            {
                 itemTexts[i].text = $"{new[] { "Air Pump", "Laser Gun", "Trampoline" }[i]}  x{systems.GetItemCount((FieldItemKind)i)}";
+                ActorKind owner=i==0?ActorKind.Pufferfish:i==1?ActorKind.Cat:ActorKind.Seal;
+                itemButtons[i].interactable=systems.CanUseItem((FieldItemKind)i,systems.GetActorForUI(owner));
+            }
             bool ended = runLoop.State == RunState.Defeated || runLoop.State == RunState.RunComplete;
             resultPanel.SetActive(ended);
             if (ended) resultText.text = $"{(runLoop.State == RunState.Defeated ? "GAME OVER" : "TIME UP")}\n\nSCORE  {systems.Score}\nCoins {systems.Coins}   Chips {systems.Chips}";

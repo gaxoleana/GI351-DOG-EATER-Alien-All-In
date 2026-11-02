@@ -54,17 +54,18 @@ namespace AlienAllIn
         bool sealAttackPending;
         Vector2 pufferDirection;
         float catLaserClock;
+        int catShotsRemaining;
+        const int CatUltimateShotCount = 5;
 
         [Header("Prototype Ultimate and combat movement")]
         [SerializeField, Min(.1f)] float ultimateChargePerDamage = 30f;
         [SerializeField, Min(.1f)] float sealUltimateDuration = 3f;
-        [SerializeField, Min(.1f)] float catLaserReach = 10f;
 
         // Shared by the selection preview; combat keeps using these same source values.
         public float GetAttackPreviewRadius(GridActor actor)
         {
-            if (!actor || actor.kind == ActorKind.Duck || actor.kind == ActorKind.Seal) return 0f;
-            return actor.kind == ActorKind.Cat && actor.IsUltimateActive ? catLaserReach : actor.attackRange;
+            if (!actor || actor.kind == ActorKind.Duck || actor.kind == ActorKind.Seal || actor.kind == ActorKind.Cat) return 0f;
+            return actor.attackRange;
         }
 
         public string GetAttackRangeDescription(GridActor actor)
@@ -72,6 +73,8 @@ namespace AlienAllIn
             if (!actor || actor.kind == ActorKind.Duck) return "No attack";
             if (actor.kind == ActorKind.Seal)
                 return actor.IsUltimateActive ? "Ultimate: 5x5, corners excluded" : "Attack: 3x3 cells";
+            if (actor.kind == ActorKind.Cat)
+                return actor.IsUltimateActive ? "Ultimate: whole active board" : "Attack: 5x5 cells, corners excluded";
             string label = actor.kind == ActorKind.Pufferfish ? "Lock-on range" : actor.IsUltimateActive ? "Ultimate sweep reach" : "Attack range";
             return $"{label}: {GetAttackPreviewRadius(actor):0.0} units";
         }
@@ -99,6 +102,7 @@ namespace AlienAllIn
             if (attackVfx) attackVfx.Clear();
             pufferDirection = Vector2.zero;
             catLaserClock = 0f;
+            catShotsRemaining = 0;
         }
 
         void TickCombat(float dt)
@@ -461,11 +465,25 @@ namespace AlienAllIn
             if (attackVfx) attackVfx.SealGrid(seal.transform.position, false, .25f);
         }
 
+        GridActor FindCatNormalTarget()
+        {
+            cat.RefreshCell(); GridActor nearest=null; float best=float.PositiveInfinity;
+            foreach(var enemy in enemies)
+            {
+                if(!enemy || !enemy.Alive) continue;
+                enemy.RefreshCell();
+                if(!board.Contains(enemy.CurrentCell) || !CatAttackRange.Contains(enemy.CurrentCell-cat.CurrentCell)) continue;
+                float distance=(enemy.transform.position-cat.transform.position).sqrMagnitude;
+                if(distance<best) {nearest=enemy;best=distance;}
+            }
+            return nearest;
+        }
+
         void TickCat(float dt)
         {
             if (cat.IsUltimateActive) { TickCatLasers(dt); return; }
             catAttackClock -= dt;
-            GridActor target = FindNearestEnemy(cat.transform.position, cat.attackRange);
+            GridActor target = FindCatNormalTarget();
             if (!target || catAttackClock > 0f) return;
             catAttackClock = cat.EffectiveAttackInterval;
             if (cat.TryGetComponent(out AlienAnimationDriver animation)) animation.PlayAttack();
@@ -633,26 +651,21 @@ namespace AlienAllIn
 
         void TickCatLasers(float dt)
         {
+            if (!cat.IsUltimateActive) return;
             catLaserClock -= dt;
             if (catLaserClock > 0f) return;
-            catLaserClock = catLaserHitIntervalSeconds;
-            Vector2 center = cat.transform.position;
-            float phase = (catLaserDurationSeconds - cat.UltimateRemaining) *
-                          (360f * Mathf.Max(.1f, catLaserRevolutions) / Mathf.Max(.1f, catLaserDurationSeconds));
+            if (catShotsRemaining <= 0)
+            {
+                cat.EndUltimate();
+                catAttackClock = cat.EffectiveAttackInterval;
+                return;
+            }
+            catShotsRemaining--;
+            catLaserClock = catShotsRemaining > 0 ? catLaserHitIntervalSeconds : AttackVfx.CatShotSeconds;
+            if (attackVfx) attackVfx.CatUltimateShot();
             foreach (GridActor enemy in enemies)
             {
-                if (!enemy || !enemy.Alive) continue;
-                Vector2 offset = (Vector2)enemy.transform.position - center;
-                float angle = Mathf.Atan2(offset.y, offset.x) * Mathf.Rad2Deg;
-                float nearest = 180f;
-                for (int beam = 0; beam < 8; beam++)
-                {
-                    float beamAngle = phase + beam * 45f;
-                    float difference = Mathf.Abs(Mathf.DeltaAngle(angle, beamAngle));
-                    nearest = Mathf.Min(nearest, Mathf.Min(difference, Mathf.Abs(difference - 180f)));
-                }
-                if (offset.magnitude > catLaserReach || nearest > catLaserArcDegrees * .5f) continue;
-                if (attackVfx) attackVfx.CatLaser(cat.transform.position, enemy.transform.position);
+                if (!enemy || !enemy.Alive || !board.TryWorldToCell(enemy.transform.position,out _)) continue;
                 float dealt = enemy.Hurt(catLaserDamage + cat.EffectiveDamage * .25f);
                 RegisterEnemyHit(cat, enemy, dealt, true);
                 InterruptWorkerAt(enemy);
@@ -663,6 +676,7 @@ namespace AlienAllIn
         {
             if (!runLoop || runLoop.State != RunState.Running || !actor || !actor.Alive || !actor.UltimateFull || actor.kind == ActorKind.Duck) return false;
             float duration = actor.kind == ActorKind.Seal ? sealUltimateDuration : catLaserDurationSeconds;
+            if (actor.kind == ActorKind.Cat) duration = Mathf.Max(duration, catLaserHitIntervalSeconds * CatUltimateShotCount + 1f);
             if (actor.kind == ActorKind.Pufferfish) duration = pufferFloatSeconds;
             if (!actor.BeginUltimate(duration)) return false;
             if (actor.kind == ActorKind.Seal)
@@ -670,7 +684,11 @@ namespace AlienAllIn
                 sealRipples.Add(new RippleRuntime { origin = seal.transform.position });
                 if (attackVfx) attackVfx.SealGrid(seal.transform.position, true, .65f);
             }
-            else if (actor.kind == ActorKind.Cat) catLaserClock = 0f;
+            else if (actor.kind == ActorKind.Cat)
+            {
+                catLaserClock = 0f;
+                catShotsRemaining = CatUltimateShotCount;
+            }
             else if (actor.kind == ActorKind.Pufferfish)
             {
                 ResetPufferCycle();

@@ -119,6 +119,8 @@ namespace AlienAllIn.Tests
 
             // 2. Alien hit feedback: same red flash, bouncy scale, and bold red "-x" at top-right of Alien.
             loop.Restart(); loop.StartRun(); loop.Pause();
+            // Restart destroys the previous popup at the end of the frame.
+            yield return null;
             systems.DebugStopEnemySpawns = systems.DebugStopStationSpawns = true;
             var seal = systems.Seal;
             seal.transform.position = systems.Board.CellCenter(new Vector2Int(2, 2));
