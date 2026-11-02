@@ -7,6 +7,10 @@ namespace AlienAllIn
 {
     public sealed partial class MainCoreGameplayUI
     {
+        const int DamageFloatingFontSize = 28;
+        const int CasinoTickFontSize = 15;
+        const int CasinoResultFontSize = 20;
+
         [Header("Casino visual prototype")]
         [SerializeField, Min(.1f)] float casinoBounceFrequency = 2.5f;
         [SerializeField, Range(0f, .3f)] float casinoBounceAmount = .10f;
@@ -28,7 +32,9 @@ namespace AlienAllIn
         Texture2D thoughtTexture;
         Sprite thoughtSprite;
         readonly System.Collections.Generic.List<CasinoTickVisual> casinoTickVisuals = new System.Collections.Generic.List<CasinoTickVisual>();
-        sealed class CasinoTickVisual { public Text label; public float age; public Vector2 origin; }
+        readonly System.Collections.Generic.List<DamageFloatingVisual> damageFloatingVisuals = new System.Collections.Generic.List<DamageFloatingVisual>();
+        sealed class CasinoTickVisual { public Text label; public float age; public Vector3 worldOrigin; }
+        sealed class DamageFloatingVisual { public Text label; public float age; public GridActor actor; public Vector3 lastWorldPosition; }
 
         void InitializeCasinoVisuals()
         {
@@ -36,7 +42,7 @@ namespace AlienAllIn
             go.transform.SetParent(hudCanvas.transform, false);
             casinoChipBadge = go.GetComponent<RectTransform>();
             casinoChipBadge.anchorMin = casinoChipBadge.anchorMax = new Vector2(.5f, .5f);
-            casinoChipBadge.sizeDelta = new Vector2(270, 86);
+            casinoChipBadge.sizeDelta = new Vector2(210, 64);
             var background = go.GetComponent<Image>();
             background.color = Color.clear;
             background.raycastTarget = false;
@@ -44,7 +50,7 @@ namespace AlienAllIn
             label.transform.SetParent(go.transform, false);
             casinoFloatingText = label.GetComponent<Text>();
             casinoFloatingText.font = walletText.font;
-            casinoFloatingText.fontSize = 30;
+            casinoFloatingText.fontSize = CasinoResultFontSize;
             casinoFloatingText.fontStyle = FontStyle.Bold;
             casinoFloatingText.color = new Color(.15f, .9f, .25f);
             casinoFloatingText.alignment = TextAnchor.MiddleCenter;
@@ -57,11 +63,12 @@ namespace AlienAllIn
             casinoFloatingText.supportRichText = true;
             casinoFloatingText.rectTransform.anchorMin = Vector2.zero;
             casinoFloatingText.rectTransform.anchorMax = Vector2.one;
-            casinoFloatingText.rectTransform.offsetMin = new Vector2(8, 4);
-            casinoFloatingText.rectTransform.offsetMax = new Vector2(-8, -4);
+            casinoFloatingText.rectTransform.offsetMin = new Vector2(6, 2);
+            casinoFloatingText.rectTransform.offsetMax = new Vector2(-6, -2);
             go.SetActive(false);
             systems.CasinoRoundResolved += ShowCasinoResult;
             systems.CasinoChipTick += ShowCasinoChipTick;
+            GridActor.Damaged += ShowActorDamagePopup;
             runLoop.RunRestarted += ResetCasinoVisuals;
             CreateCasinoThought();
         }
@@ -70,11 +77,15 @@ namespace AlienAllIn
         {
             if (systems) systems.CasinoRoundResolved -= ShowCasinoResult;
             if (systems) systems.CasinoChipTick -= ShowCasinoChipTick;
+            GridActor.Damaged -= ShowActorDamagePopup;
             if (runLoop) runLoop.RunRestarted -= ResetCasinoVisuals;
             RestoreCasinoArtwork();
             if (casinoChipBadge) Destroy(casinoChipBadge.gameObject);
             if (casinoThought) Destroy(casinoThought.gameObject);
             foreach (var tick in casinoTickVisuals) if (tick.label) Destroy(tick.label.gameObject);
+            casinoTickVisuals.Clear();
+            foreach (var popup in damageFloatingVisuals) if (popup.label) Destroy(popup.label.gameObject);
+            damageFloatingVisuals.Clear();
             if (thoughtSprite) Destroy(thoughtSprite);
             if (thoughtTexture) Destroy(thoughtTexture);
         }
@@ -96,6 +107,8 @@ namespace AlienAllIn
             if (casinoThought) casinoThought.gameObject.SetActive(false);
             foreach (var tick in casinoTickVisuals) if (tick.label) Destroy(tick.label.gameObject);
             casinoTickVisuals.Clear();
+            foreach (var popup in damageFloatingVisuals) if (popup.label) Destroy(popup.label.gameObject);
+            damageFloatingVisuals.Clear();
         }
 
         void ShowCasinoResult(long amount, int multiplier)
@@ -107,17 +120,27 @@ namespace AlienAllIn
             resultClock = 0;
         }
 
-        Vector2 CasinoLabelPosition(ActivityStation machine)
+        Vector2 WorldToHudPosition(Vector3 worldPosition, float clampMarginX = 36f, float clampMarginY = 24f)
         {
-            Vector3 screen = stageCamera.WorldToScreenPoint(machine.transform.position);
+            Vector3 screen = stageCamera.WorldToScreenPoint(worldPosition);
             RectTransformUtility.ScreenPointToLocalPointInRectangle((RectTransform)hudCanvas.transform, screen,
                 hudCanvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : hudCanvas.worldCamera, out Vector2 local);
-            local += new Vector2(90, 90);
             Rect canvas = ((RectTransform)hudCanvas.transform).rect;
             Rect boardView = screenLayout.BoardViewport;
-            local.x = Mathf.Clamp(local.x, canvas.xMin + boardView.xMin * canvas.width + 140, canvas.xMin + boardView.xMax * canvas.width - 140);
-            local.y = Mathf.Clamp(local.y, canvas.yMin + boardView.yMin * canvas.height + 48, canvas.yMin + boardView.yMax * canvas.height - 48);
+            local.x = Mathf.Clamp(local.x, canvas.xMin + boardView.xMin * canvas.width + clampMarginX, canvas.xMin + boardView.xMax * canvas.width - clampMarginX);
+            local.y = Mathf.Clamp(local.y, canvas.yMin + boardView.yMin * canvas.height + clampMarginY, canvas.yMin + boardView.yMax * canvas.height - clampMarginY);
             return local;
+        }
+
+        Vector3 TopRightWorldPosition(Vector3 centerWorldPosition, float cellFractionX = .42f, float cellFractionY = .42f)
+        {
+            float cell = board ? board.cellSize : 1f;
+            return centerWorldPosition + new Vector3(cell * cellFractionX, cell * cellFractionY, 0f);
+        }
+
+        Vector2 CasinoLabelPosition(ActivityStation machine)
+        {
+            return WorldToHudPosition(TopRightWorldPosition(machine.transform.position, .45f, .45f), 42f, 24f);
         }
 
         Vector2 WalletLabelPosition()
@@ -131,9 +154,10 @@ namespace AlienAllIn
         void AdvanceCasinoVisuals()
         {
             if (!casinoFloatingText || !systems || !runLoop) return;
+            float dt = runLoop.GameplayDeltaTime;
+            AdvanceDamageFloatingVisuals(dt);
             ActivityStation machine = systems.CasinoMachine;
             if (!machine) { ResetCasinoVisuals(); return; }
-            float dt = runLoop.GameplayDeltaTime;
             Transform art = machine.artwork ? machine.artwork.transform : null;
             if (art && art != bouncingArtwork)
             {
@@ -149,9 +173,11 @@ namespace AlienAllIn
             {
                 var tick = casinoTickVisuals[i];
                 tick.age += dt;
-                float t = tick.age / 1.2f;
-                if (t >= 1) { Destroy(tick.label.gameObject); casinoTickVisuals.RemoveAt(i); continue; }
-                tick.label.rectTransform.anchoredPosition = tick.origin + Vector2.up * (t * 32);
+                float t = tick.age / 1.1f;
+                if (t >= 1 || !tick.label) { if (tick.label) Destroy(tick.label.gameObject); casinoTickVisuals.RemoveAt(i); continue; }
+                Vector3 basePos = systems.CasinoMachine ? TopRightWorldPosition(systems.CasinoMachine.transform.position, .44f, .44f) : tick.worldOrigin;
+                Vector2 origin = WorldToHudPosition(basePos, 28f, 18f);
+                tick.label.rectTransform.anchoredPosition = origin + Vector2.up * (t * 24f);
                 Color tickColor = tick.label.text.StartsWith("-", StringComparison.Ordinal)
                     ? new Color(1f, .15f, .12f) : new Color(.15f, 1f, .25f);
                 tickColor.a = Mathf.Min(t / .12f, (1 - t) / .45f);
@@ -179,7 +205,7 @@ namespace AlienAllIn
                 float end = holdEnd + Mathf.Max(.1f, casinoChipFlightSeconds);
                 float t = Mathf.Clamp01(resultClock / countDuration);
                 long displayed = (long)Math.Round(Math.Abs((double)visualResult) * (1 - Math.Pow(1 - t, 3)));
-                casinoFloatingText.text = $"<size=15>NET RESULT</size>\n{(visualResult < 0 ? "-" : "+")}{CompactChips(displayed)} Chips (x{visualMultiplier})";
+                casinoFloatingText.text = $"<size=11>NET RESULT</size>\n{(visualResult < 0 ? "-" : "+")}{CompactChips(displayed)} Chips (x{visualMultiplier})";
                 casinoFloatingText.color = visualResult < 0 ? new Color(1f, .15f, .12f) : new Color(.15f, 1f, .25f);
                 Vector2 position = CasinoLabelPosition(machine);
                 if (resultClock >= holdEnd && visualResult > 0)
@@ -205,16 +231,85 @@ namespace AlienAllIn
             var go = new GameObject("Casino Chip tick", typeof(RectTransform), typeof(CanvasRenderer), typeof(Text), typeof(Outline));
             go.transform.SetParent(hudCanvas.transform, false);
             Text text = go.GetComponent<Text>();
-            text.font = walletText.font; text.fontSize = 23; text.fontStyle = FontStyle.Bold;
+            text.font = walletText.font; text.fontSize = CasinoTickFontSize; text.fontStyle = FontStyle.Bold;
             text.text = $"{(amount < 0 ? "-" : "+")}{CompactChips(Math.Abs(amount))} Chips";
-            text.raycastTarget = false; text.alignment = TextAnchor.MiddleCenter;
+            text.raycastTarget = false; text.alignment = TextAnchor.MiddleLeft;
+            text.horizontalOverflow = HorizontalWrapMode.Overflow;
+            text.verticalOverflow = VerticalWrapMode.Overflow;
             text.color = new Color(.15f, 1, .25f, 0);
-            go.GetComponent<Outline>().effectColor = new Color(0, .12f, .02f, .9f);
-            text.rectTransform.anchorMin = text.rectTransform.anchorMax = new Vector2(.5f,.5f);
-            text.rectTransform.sizeDelta = new Vector2(200, 40);
-            Vector2 origin = CasinoLabelPosition(systems.CasinoMachine) + new Vector2(0, -35);
-            text.rectTransform.anchoredPosition = origin;
-            casinoTickVisuals.Add(new CasinoTickVisual { label = text, origin = origin });
+            var outline = go.GetComponent<Outline>();
+            outline.effectColor = new Color(0, .12f, .02f, .9f);
+            outline.effectDistance = new Vector2(1, -1);
+            text.rectTransform.anchorMin = text.rectTransform.anchorMax = new Vector2(.5f, .5f);
+            text.rectTransform.pivot = new Vector2(0f, .5f);
+            text.rectTransform.sizeDelta = new Vector2(140, 28);
+            Vector3 worldOrigin = TopRightWorldPosition(systems.CasinoMachine.transform.position, .44f, .44f);
+            text.rectTransform.anchoredPosition = WorldToHudPosition(worldOrigin, 28f, 18f);
+            casinoTickVisuals.Add(new CasinoTickVisual { label = text, worldOrigin = worldOrigin });
+        }
+
+        void ShowActorDamagePopup(GridActor actor, Vector3 worldPosition, float dealt)
+        {
+            if (!hudCanvas || !stageCamera || !screenLayout || !actor || dealt <= 0f) return;
+            var go = new GameObject("Damage floating text", typeof(RectTransform), typeof(CanvasRenderer), typeof(Text), typeof(Outline));
+            go.transform.SetParent(hudCanvas.transform, false);
+            Text text = go.GetComponent<Text>();
+            text.font = walletText.font;
+            text.fontSize = DamageFloatingFontSize;
+            text.fontStyle = FontStyle.Bold;
+            text.text = $"-{FormatDamage(dealt)}";
+            text.raycastTarget = false;
+            text.alignment = TextAnchor.MiddleLeft;
+            text.horizontalOverflow = HorizontalWrapMode.Overflow;
+            text.verticalOverflow = VerticalWrapMode.Overflow;
+            text.color = new Color(1f, .12f, .12f, 1f);
+            var outline = go.GetComponent<Outline>();
+            outline.effectColor = new Color(.15f, 0f, 0f, .95f);
+            outline.effectDistance = new Vector2(1.5f, -1.5f);
+            text.rectTransform.anchorMin = text.rectTransform.anchorMax = new Vector2(.5f, .5f);
+            text.rectTransform.pivot = new Vector2(0f, .5f);
+            text.rectTransform.sizeDelta = new Vector2(120, 40);
+            Vector3 cornerWorld = TopRightWorldPosition(worldPosition, .38f, .38f);
+            text.rectTransform.anchoredPosition = WorldToHudPosition(cornerWorld, 20f, 16f);
+            damageFloatingVisuals.Add(new DamageFloatingVisual
+            {
+                label = text,
+                actor = actor,
+                lastWorldPosition = worldPosition
+            });
+        }
+
+        void AdvanceDamageFloatingVisuals(float dt)
+        {
+            for (int i = damageFloatingVisuals.Count - 1; i >= 0; i--)
+            {
+                var popup = damageFloatingVisuals[i];
+                popup.age += dt;
+                float t = popup.age / .8f;
+                if (t >= 1f || !popup.label)
+                {
+                    if (popup.label) Destroy(popup.label.gameObject);
+                    damageFloatingVisuals.RemoveAt(i);
+                    continue;
+                }
+                if (popup.actor && popup.actor.Alive && popup.actor.gameObject.activeInHierarchy)
+                    popup.lastWorldPosition = popup.actor.transform.position;
+                Vector3 cornerWorld = TopRightWorldPosition(popup.lastWorldPosition, .38f, .38f);
+                Vector2 baseHud = WorldToHudPosition(cornerWorld, 20f, 16f);
+                popup.label.rectTransform.anchoredPosition = baseHud + new Vector2(t * 6f, t * 28f);
+                float popScale = t < .18f ? Mathf.Lerp(1.25f, 1f, t / .18f) : 1f;
+                popup.label.rectTransform.localScale = Vector3.one * popScale;
+                Color color = new Color(1f, .12f, .12f, Mathf.Clamp01((1f - t) / .35f));
+                popup.label.color = color;
+            }
+        }
+
+        static string FormatDamage(float amount)
+        {
+            float rounded = Mathf.Round(amount * 10f) / 10f;
+            return Mathf.Abs(rounded - Mathf.Round(rounded)) < .05f
+                ? Mathf.RoundToInt(rounded).ToString(CultureInfo.InvariantCulture)
+                : rounded.ToString("0.#", CultureInfo.InvariantCulture);
         }
 
         void CreateCasinoThought()
@@ -246,7 +341,8 @@ namespace AlienAllIn
             casinoThought.gameObject.SetActive(working);
             casinoThoughtSymbol.text=systems.CasinoLosing ? "\u2715" : "\u2713";
             casinoThoughtSymbol.color=systems.CasinoLosing ? new Color(.85f,.1f,.1f) : new Color(.05f,.55f,.15f);
-            casinoThought.anchoredPosition=CasinoLabelPosition(machine)+new Vector2(-135,-15);
+            Vector3 topLeft = machine.transform.position + new Vector3(-(board ? board.cellSize : 1f) * .42f, (board ? board.cellSize : 1f) * .45f, 0f);
+            casinoThought.anchoredPosition=WorldToHudPosition(topLeft, 32f, 24f);
         }
 
         static string CompactChips(long amount)

@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 namespace AlienAllIn
@@ -13,6 +14,13 @@ namespace AlienAllIn
     [DisallowMultipleComponent]
     public sealed class GridActor : MonoBehaviour
     {
+        public static event Action<GridActor, Vector3, float> Damaged;
+        const float HitFlashDurationSeconds = .25f;
+        const float HitBounceDurationSeconds = .32f;
+        const float HitBounceOscillations = 2.5f;
+        const float HitBounceDamping = 4f;
+        const float HitBounceAmplitude = .26f;
+
         public ActorKind kind;
         [Tooltip("Only active run members contribute to the RunLoop defeat condition. Enemies are never run members.")]
         public bool countsAsActiveRunMember = true;
@@ -40,6 +48,7 @@ namespace AlienAllIn
         [SerializeField] Vector2Int startingCell;
         [SerializeField] bool hasStartingPosition;
         float effectTimer;
+        float bounceTimer;
         float ultimateRemaining;
         float maxHealthBonus;
         float damageBonus;
@@ -50,6 +59,9 @@ namespace AlienAllIn
         int healthUpgradeRank;
         Color originalBodyColor = Color.white;
         bool bodyColorCaptured;
+        Transform visualRoot;
+        Vector3 visualBaseScale = Vector3.one;
+        bool visualScaleCaptured;
         public Vector2Int CurrentCell => currentCell;
         public bool IsOnBoard => isOnBoard;
         public float Health => health;
@@ -72,6 +84,7 @@ namespace AlienAllIn
         public float UltimateRemaining => ultimateRemaining;
         public float AttackTimer { get; set; }
         public float HitTimer { get; private set; }
+        public float BounceTimer => bounceTimer;
         public bool CanPickUp
         {
             get
@@ -84,7 +97,11 @@ namespace AlienAllIn
             }
         }
 
-        void Awake() => ResolveBodyRenderer();
+        void Awake()
+        {
+            ResolveBodyRenderer();
+            ResolveVisualScale();
+        }
 
         void OnValidate()
         {
@@ -103,6 +120,34 @@ namespace AlienAllIn
             }
         }
 
+        void ResolveVisualScale()
+        {
+            Transform target = art ? art : transform;
+            if (visualRoot != target || !visualScaleCaptured)
+            {
+                visualRoot = target;
+                visualBaseScale = target.localScale;
+                visualScaleCaptured = true;
+            }
+        }
+
+        void ApplyBounceScale()
+        {
+            ResolveVisualScale();
+            if (!visualRoot) return;
+            if (bounceTimer <= 0f)
+            {
+                visualRoot.localScale = visualBaseScale;
+                return;
+            }
+            float progress = 1f - Mathf.Clamp01(bounceTimer / HitBounceDurationSeconds);
+            float wave = Mathf.Sin(progress * Mathf.PI * 2f * HitBounceOscillations) * Mathf.Exp(-progress * HitBounceDamping);
+            visualRoot.localScale = Vector3.Scale(visualBaseScale, new Vector3(
+                1f + wave * HitBounceAmplitude,
+                1f - wave * HitBounceAmplitude,
+                1f));
+        }
+
         public void ResetActor()
         {
             gameObject.SetActive(true);
@@ -115,8 +160,9 @@ namespace AlienAllIn
             damageReduction = 0f;
             damageUpgradeRank = castSpeedUpgradeRank = healthUpgradeRank = 0;
             state = ActorState.Idle;
-            AttackTimer = HitTimer = 0;
+            AttackTimer = HitTimer = bounceTimer = 0;
             effectTimer = 0;
+            ApplyBounceScale();
             RefreshCell();
             Present(0, false);
             if (TryGetComponent(out AlienAnimationDriver animationDriver)) animationDriver.ResetToIdle();
@@ -146,10 +192,17 @@ namespace AlienAllIn
             if (!Alive || invulnerable) return 0f;
             float before = health;
             float applied = Mathf.Max(0f, amount) * (1f - damageReduction);
+            float dealt = Mathf.Min(before, applied);
             health = Mathf.Max(0, health - applied);
-            HitTimer = .25f;
+            HitTimer = HitFlashDurationSeconds;
+            bounceTimer = HitBounceDurationSeconds;
+            ResolveBodyRenderer();
+            if (bodyRenderer) bodyRenderer.color = Color.Lerp(originalBodyColor, Color.red, .85f);
+            ApplyBounceScale();
+            Vector3 hitPosition = transform.position;
             if (!Alive) { state = ActorState.Dead; gameObject.SetActive(false); }
-            return Mathf.Min(before, applied);
+            if (dealt > 0f) Damaged?.Invoke(this, hitPosition, dealt);
+            return dealt;
         }
 
         public float Heal(float amount)
@@ -163,9 +216,10 @@ namespace AlienAllIn
         public void DebugRestoreHealth()
         {
             health = EffectiveMaxHealth;
-            HitTimer = 0;
+            HitTimer = bounceTimer = 0;
             ResolveBodyRenderer();
             if (bodyRenderer) bodyRenderer.color = originalBodyColor;
+            ApplyBounceScale();
             if (state == ActorState.Dead) state = ActorState.Idle;
             gameObject.SetActive(true);
             RefreshCell();
@@ -175,10 +229,11 @@ namespace AlienAllIn
         {
             health = EffectiveMaxHealth;
             switchCharge = ultimateRemaining = effectTimer = 0f;
-            AttackTimer = HitTimer = 0f;
+            AttackTimer = HitTimer = bounceTimer = 0f;
             state = ActorState.Idle;
             ResolveBodyRenderer();
             if (bodyRenderer) bodyRenderer.color = originalBodyColor;
+            ApplyBounceScale();
             if (attackEffect) attackEffect.enabled = false;
             gameObject.SetActive(true);
             RefreshCell();
@@ -189,6 +244,8 @@ namespace AlienAllIn
         {
             if (!Alive || invulnerable) return;
             health = 0f;
+            HitTimer = bounceTimer = 0f;
+            ApplyBounceScale();
             state = ActorState.Dead;
             gameObject.SetActive(false);
         }
@@ -221,11 +278,13 @@ namespace AlienAllIn
         {
             if (dt <= 0f) return;
             HitTimer = Mathf.Max(0f, HitTimer - dt);
+            bounceTimer = Mathf.Max(0f, bounceTimer - dt);
             effectTimer = Mathf.Max(0f, effectTimer - dt);
             ultimateRemaining = Mathf.Max(0f, ultimateRemaining - dt);
             if (attackEffect) attackEffect.enabled = effectTimer > 0f;
             if (bodyRenderer)
-                bodyRenderer.color = HitTimer > 0f ? Color.Lerp(originalBodyColor, Color.red, .7f) : originalBodyColor;
+                bodyRenderer.color = HitTimer > 0f ? Color.Lerp(originalBodyColor, Color.red, .85f) : originalBodyColor;
+            ApplyBounceScale();
             if (!IsUltimateActive && state == ActorState.UsingUltimate) state = ActorState.Idle;
         }
 
@@ -277,7 +336,7 @@ namespace AlienAllIn
         {
             AdvanceRuntime(dt);
             if (selectionRing) selectionRing.enabled = selected;
-            if (art) art.localScale = HitTimer > 0 ? new Vector3(1.12f, .86f, 1) : Vector3.one;
+            ApplyBounceScale();
         }
 
         void OnDrawGizmosSelected()
