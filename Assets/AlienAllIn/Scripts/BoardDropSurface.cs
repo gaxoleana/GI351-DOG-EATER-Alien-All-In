@@ -11,7 +11,7 @@ namespace AlienAllIn
         public void Configure(MainCoreGameplayUI owner) => ui = owner;
         public void OnPointerClick(PointerEventData eventData)
         {
-            if (ui && !eventData.dragging) ui.OpenCharacter(ui.ActorAtScreenPoint(eventData.position));
+            if (ui && !eventData.dragging) ui.OpenBoardTargetAtScreen(eventData.position);
         }
         public void OnBeginDrag(PointerEventData eventData)
         {

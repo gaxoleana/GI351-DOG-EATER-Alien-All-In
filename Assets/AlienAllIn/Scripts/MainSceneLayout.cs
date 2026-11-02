@@ -20,16 +20,18 @@ namespace AlienAllIn
         public void FocusActor(GridActor actor) { focusedActor = actor; if (actor) focusPoint = actor.transform.position; }
 
         [Header("Editable screen regions (normalized coordinates)")]
-        [SerializeField] Rect headerRegion = new Rect(.16f,.86f,.80f,.10f);
-        [SerializeField] Rect reservedLeftRegion = new Rect(.035f,.18f,.10f,.66f);
-        [SerializeField] Rect statusRegion = new Rect(.885f,.29f,.075f,.45f);
-        [SerializeField] Rect boardRegion = new Rect(.16f,.18f,.68f,.66f);
-        [SerializeField] Rect itemsRegion = new Rect(.38f,.04f,.24f,.09f);
+        [SerializeField] Rect headerRegion = new Rect(0,506f/558f,1,52f/558f);
+        [SerializeField] Rect reservedLeftRegion = new Rect(0,149f/558f,78f/992f,259f/558f);
+        [SerializeField] Rect statusRegion = new Rect(909f/992f,131f/558f,78f/992f,259f/558f);
+        [SerializeField] Rect boardRegion = new Rect(134f/992f,83f/558f,724f/992f,389f/558f);
+        [SerializeField] Rect itemsRegion = new Rect(909f/992f,131f/558f,78f/992f,259f/558f);
+        [SerializeField] Rect teamRegion = new Rect(86f/992f,0,820f/992f,78f/558f);
         public Rect Header => headerRegion;
         public Rect LeftColumn => reservedLeftRegion;
         public Rect RightColumn => statusRegion;
         public Rect BoardViewport => boardRegion;
         public Rect ItemBar => itemsRegion;
+        public Rect TeamBar => teamRegion;
         public Color BackgroundColor => backgroundColor;
         public bool FrameMaximumBoard { get => frameMaximumBoard; set { frameMaximumBoard = value; RefreshCamera(); } }
 

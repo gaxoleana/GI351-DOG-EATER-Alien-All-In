@@ -67,7 +67,7 @@ namespace AlienAllIn
         [SerializeField, Range(1f, 180f)] float catLaserArcDegrees = 35f;
         [SerializeField, Min(.1f)] float pufferInflateSeconds = .55f;
         [SerializeField, Min(.1f)] float pufferFloatSeconds = 3.5f;
-        [SerializeField, Min(.1f)] float pufferFloatSpeed = 3f;
+        [SerializeField, Min(.1f)] float pufferFloatSpeed = 1.12f;
         [SerializeField, Min(0f)] float pufferCollisionRadius = .34f;
         [SerializeField, Min(0f)] float pufferDamageMultiplier = .5f;
         [SerializeField, Min(1f)] float pufferUltimateSpeedMultiplier = 1.6f;
@@ -164,8 +164,11 @@ namespace AlienAllIn
             if (!processContainer) processContainer = transform;
             if (!pickupContainer) pickupContainer = processContainer;
             seal.damageForFullCharge = cat.damageForFullCharge = pufferfish.damageForFullCharge = ultimateChargePerDamage;
+            seal.attackInterval = cat.attackInterval = 2f;
             ResetForNewRun();
         }
+
+        void Start() => InitializePersistentCasino();
 
         void Update()
         {
@@ -196,13 +199,14 @@ namespace AlienAllIn
         void ResetForNewRun()
         {
             DebugStopEnemySpawns = DebugStopStationSpawns = false;
-            ClearSpawned(stations);
+            ResetStationsForNewRun();
             ClearSpawned(fieldItems);
             coins = score = processedStations = 0;
             processSpawnClock = 0f;
             itemSpawnClock = Mathf.Max(.1f, firstItemSpawnDelaySeconds);
             statusMessage = "Run ready. Start with empty inventories.";
             ResetEconomyForNewRun();
+            ResetCasinoForNewRun();
             ResetOrdersAndRescue();
             ResetCombatForNewRun();
             ReconcileDebugBoard();
@@ -249,6 +253,13 @@ namespace AlienAllIn
                 return false;
             }
 
+            if (settings.kind == ActivityKind.Casino)
+            {
+                statusMessage = "The Casino is permanent and cannot be spawned again.";
+                RunDataChanged?.Invoke();
+                return false;
+            }
+
             if (!TryChooseOpenCell(true, out Vector2Int selectedCell))
             {
                 statusMessage = "Process roll skipped: no valid cell; try next interval.";
@@ -286,12 +297,13 @@ namespace AlienAllIn
         {
             if (activitySettings == null || activitySettings.Length == 0) return null;
             int validCount = 0;
-            for (int i = 0; i < activitySettings.Length; i++) if (activitySettings[i] != null) validCount++;
+            for (int i = 0; i < activitySettings.Length; i++)
+                if (activitySettings[i] != null && activitySettings[i].kind != ActivityKind.Casino) validCount++;
             if (validCount == 0) return null;
             int chosen = UnityEngine.Random.Range(0, validCount);
             for (int i = 0; i < activitySettings.Length; i++)
             {
-                if (activitySettings[i] == null) continue;
+                if (activitySettings[i] == null || activitySettings[i].kind == ActivityKind.Casino) continue;
                 if (chosen-- == 0) return activitySettings[i];
             }
             return null;
@@ -375,6 +387,23 @@ namespace AlienAllIn
         {
             if (!duck || !duck.Alive) return;
             if (DuckCaptured || manualDestinations.ContainsKey(duck)) return;
+
+            if (casinoWorker == duck)
+            {
+                if (IsDuckTargetedByEnemy())
+                {
+                    duck.State = ActorState.Panic;
+                    duck.AddUltimateCharge(duckPanicChargePerSecond * dt);
+                    return;
+                }
+                if (duck.State == ActorState.Panic)
+                {
+                    duck.AddUltimateCharge(duckPanicChargePerSecond * dt);
+                    return;
+                }
+                duck.State = ActorState.Working;
+                return;
+            }
 
             if (duck.UltimateFull && !duck.IsUltimateActive)
             {
@@ -481,7 +510,7 @@ namespace AlienAllIn
             float bestDistance = float.PositiveInfinity;
             foreach (ActivityStation station in stations)
             {
-                if (!station || station.Complete) continue;
+                if (!station || station == casinoMachine || station.Complete) continue;
                 float distance = (station.transform.position - position).sqrMagnitude;
                 if (distance >= bestDistance) continue;
                 bestDistance = distance;
@@ -493,6 +522,9 @@ namespace AlienAllIn
         GridActor FindStationWorker(ActivityStation station)
         {
             if (!station) return null;
+            if (station == casinoMachine)
+                return casinoActive && !casinoFaulted && !(casinoWorker == duck && DuckCaptured) && IsStandingAt(casinoWorker, station) &&
+                    casinoWorker.State != ActorState.Panic ? casinoWorker : null;
             GridActor owner = GetActor(station.requiredKind);
             if (IsStandingAt(owner, station)) return owner;
             if (!DuckCaptured && station.allowUniversalDuckWorker && IsStandingAt(duck, station) && duck.State != ActorState.Panic)
@@ -520,6 +552,12 @@ namespace AlienAllIn
                 if (!station)
                 {
                     stations.RemoveAt(i);
+                    continue;
+                }
+
+                if (station == casinoMachine)
+                {
+                    AdvanceCasino(dt);
                     continue;
                 }
 
@@ -597,6 +635,13 @@ namespace AlienAllIn
             if (!target) return true;
             foreach (GridActor actor in target.Occupants)
                 if (actor && actor.Alive) return true;
+            return false;
+        }
+
+        public bool IsStationCell(Vector2Int cell)
+        {
+            foreach (ActivityStation station in stations)
+                if (station && station.Cell == cell) return true;
             return false;
         }
 

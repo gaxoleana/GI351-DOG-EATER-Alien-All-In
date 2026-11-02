@@ -9,6 +9,40 @@ namespace AlienAllIn
         [SerializeField] int chips;
         public int Chips => chips;
         public float AttackUpgradeAmount => damageUpgradeAmount;
+        public const int ReviveCoinCost = 10;
+
+        public bool TryReviveTeamMember(GridActor actor)
+        {
+            if (!runLoop || (runLoop.State != RunState.Running && runLoop.State != RunState.Paused) ||
+                !actor || actor.Alive || actor.kind == ActorKind.Enemy) return false;
+            bool member = false;
+            foreach (var survivor in runLoop.Survivors) if (survivor == actor) { member = true; break; }
+            if (!member || coins < ReviveCoinCost) return false;
+            RefreshBoardOccupancy();
+            BoardCell destination = null;
+            float closest = float.PositiveInfinity;
+            foreach (var cell in board.GetComponentsInChildren<BoardCell>())
+            {
+                if (!cell.IsUnlocked || !board.Contains(cell.coordinate) || cell.Occupants.Count > 0) continue;
+                bool blocked = false;
+                foreach (var station in stations) if (station && station.Cell == cell.coordinate) { blocked = true; break; }
+                foreach (var order in manualDestinations) if (order.Key != actor && order.Value == cell.coordinate) { blocked = true; break; }
+                if (blocked) continue;
+                float distance = (board.CellCenter(cell.coordinate) - actor.transform.position).sqrMagnitude;
+                if (distance < closest) { destination = cell; closest = distance; }
+            }
+            if (!destination) { SetStatusFromUI("No open cell available to revive."); return false; }
+            coins -= ReviveCoinCost;
+            manualDestinations.Remove(actor);
+            if (actor == seal) { sealAttackPending = false; sealTelegraphClock = sealAttackClock = 0; }
+            if (actor == cat) catAttackClock = catLaserClock = 0;
+            if (actor == pufferfish) ResetPufferCycle();
+            actor.transform.position = board.CellCenter(destination.coordinate);
+            actor.Revive();
+            RefreshBoardOccupancy();
+            SetStatusFromUI($"{actor.kind} revived for {ReviveCoinCost} Coins.");
+            return true;
+        }
 
         public bool TryExchangeChipsForCoins(int amount)
             => TryExchangeCurrency(amount, true);

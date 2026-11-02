@@ -5,8 +5,10 @@
 Open `Assets/Scenes/Main.unity` in Unity **6000.5.10f1** and press Play. Main is
 the first build scene. One session lasts five minutes: a 5x5 opening board grows
 to 7x7 after 150 seconds and 10x10 after 225 seconds. Each cell is one world unit.
-Stations start empty; every 60 seconds a 25% roll may create Casino, Darts or
-Jump Rope. Stations and enemies use distinct pixel-art prefabs.
+The permanent Casino is present when Main loads and stays on the board across
+progress cycles and Restart. Other stations start empty; every 60 seconds a 25%
+roll may create Darts or Jump Rope. Stations and enemies use distinct pixel-art
+prefabs.
 
 All HUD objects are **saved in Main**, including the header, roster, Items,
 station status, character popup, result screen and O-key tools. Runtime code
@@ -20,14 +22,22 @@ widths, anchors and layouts are normal Inspector properties. MainSceneLayout
 on Main Camera controls reserved HUD regions and selection zoom (.88 default).
 
 - **Space** starts and pauses/resumes. **R** restarts. Header buttons offer Start,
-  Pause and Options; Options contains Resume and Restart.
+  Pause and Options; Options contains Resume and Restart. Coins/Chips are shown
+  directly below Score/Grid Scale/Timer; Exchange is above the right-hand Items panel.
+- The bottom status bar contains all four characters. Click a living character
+  to inspect it; click a dead character to revive it for **10 Coins** during an
+  unfinished run. Revival restores full upgraded HP, preserves purchased ATK,
+  clears Ultimate/attack state and resumes Idle animation. It uses the nearest
+  unlocked empty cell to the death position, rejecting occupied/reserved/station
+  cells. If no cell is available, it spends nothing. These restoration/location
+  rules are prototype assumptions; the 10-Coin price comes from the UI reference.
 - Click a character on the board to open its popup. Play pauses and
   the camera zooms in slightly. **X**, outside click or **Escape** closes it.
   Closing resumes only if opening the popup caused the pause.
 - Drag a character on the board onto an open cell or matching
   station. Placement snaps; during play it walks there without spending charge.
-  Seal works Casino/Jump Rope, Pufferfish works Darts, Duck works any station,
-  and Cat defends. Occupied/outside/incompatible cells are rejected.
+  Seal works Jump Rope, Pufferfish works Darts, Duck works Casino and other
+  stations, and Cat defends. Occupied/outside/incompatible cells are rejected.
 
 ## Coins, Chips and ATK upgrades
 
@@ -39,6 +49,22 @@ HP or ATK display. Defeated enemies award **1-10 shared Chips**, immediately
 collected once per enemy. Coins/Chips are separate from Score. The species Chip
 inventories and Chip Shop have been removed. Items and Ultimate gauges remain.
 
+## Casino machine
+
+Permanent Casino: choose x2/x4/x8 and pay the initial stake. Only Duck works it.
+Check earns Chips; cross loses Chips until the player clicks the machine to
+restore check for free. This replaces the old 20-Coin malfunction repair rule.
+Prototype defaults: tick every 1 second (gain and loss both bet x multiplier), and
+cross roll every 3 staffed seconds at 5%/10%/20% for x2/x4/x8. Cross persists
+across Process cycles until clicked. Rates and intervals are Inspector settings.
+Chip balance cannot fall below zero. Rebet spends another stake and resets Progress.
+Each completed cycle summarizes actual net change, including initial/rebet stake;
+there is no random final payout, duplicate award or automatic next stake charge.
+Normal work bounces with a check thought bubble; cross uses a red cross bubble.
+Actual green signed Chip ticks float above-right, fading in/up/out without a panel.
+Final net counts up with K/M/B abbreviations and multiplier; a positive summary
+flies onto the HUD Chips line. Pause freezes gameplay and visuals. Restart clears
+Casino state and effects. All rates remain prototype balance.
 ## Duck rescue
 
 Duck cannot take HP damage. An enemy reaching and hitting it captures it instead.
@@ -48,20 +74,23 @@ session. A three-second grace period prevents immediate recapture. These values
 are editable on MainRunGameplaySystems. Captured Duck cannot be moved. The
 popup pauses the rescue clock with gameplay. Losing all three fighters also
 ends the session; Duck is excluded from the fighter HP defeat count. Restart
-clears rescue state, Coins, Chips, upgrades, spawned objects and debug overrides.
+clears rescue state, Coins, Chips, upgrades, temporary spawned objects and debug
+overrides. It resets the permanent Casino but leaves it on the board.
 
 ## Attacks
 
 Seal highlights its affected grid cells before the slam (.16-second telegraph).
-Normal range follows the reference rows 1/3/5/3/1 (13 cells including center);
+Normal range is a 3x3 square (9 cells including center);
 enhanced range follows 3/5/5/5/3 (21 cells). Cells beyond the active board are
 clipped. Damage uses the same cell masks, including enemies moving within a cell. Cat draws a brief straight laser to its hit target.
 Seal uses tile highlights; Cat uses a saved LineRenderer. Both freeze while paused. Pufferfish adds no VFX:
-**stationary -> lock one target -> launch -> bounce 1 -> bounce 2 -> stop ->
-wait -> lock again**. It retains the selected enemy during locking and launches
-toward it. Enemy, ally, station and wall collisions count; sustained contact
-with one object is not counted repeatedly. The second bounce stops movement.
-If its locked target dies before launch, it waits and relocks.
+**stationary -> inflate -> launch -> continuous bouncing**. It initially aims at
+a nearby enemy, or uses a diagonal direction when no target is available.
+Enemy, ally, Casino/other station and active-board wall contacts reflect movement;
+allies and stations take no collision damage. It keeps bouncing beyond two hits.
+Manual movement and Processing can interrupt it; Restart clears its bounce state.
+Seal and Cat normal attacks use a 2-second base interval. Duck still has no attack;
+Pufferfish keeps its separate inflation/contact attack behavior. Its base speed is 1.12 cells/second (44% below the previous 2). While bouncing it slowly sways +/-22 degrees at 0.25 cycles/second. Basketball Sound.mp3 supplies a mono PCM impact trimmed from original 0.60 to 1.00 seconds, removing the initial silence (PufferBounceImpact.wav). The clip preloads and plays from the Pufferfish position with 3D linear attenuation, 40% volume and no Doppler; no collision starts no sound. Pause freezes sway and pauses sound; Restart restores rotation and clears sound. Speed, sway, volume, clip offset and segment length are Inspector settings.
 
 ## O-key debug tools
 
@@ -187,11 +216,15 @@ or Play. Normal scene editing does not require rebuilding.
 
 ## Reference HUD and pointer feedback
 
-The main HUD now follows the supplied reference: centered Score/Grid/Timer,
-Start/Pause/Options at the top right, a bottom item bar, station/enemy status on
-the right, and a blank reserved area on the left. The old roster cards are hidden.
-Coins and Chips remain visible under the central run information. Options offers
-Resume/Restart; keyboard O retains the debug tools. Hover a board character for
+The main HUD follows the latest reference inside its 992x558 game rectangle:
+centered Score/Grid Scale/Timer, Start/Pause/Options at the top right,
+Stations/Enemy on the left, three vertical Items on the right, and four compact
+character cards at the bottom. A two-pixel blue frame outlines the board viewport.
+All regions are saved scene objects; `ReferenceImageLayoutAuthoring` can reapply
+this layout without rebuilding gameplay. The full HUD authoring command also
+applies it. Coins/Chips stay visible at the top below Score/Grid Scale/Timer. The Exchange
+button above Items opens the two-way 1:1 shop and pauses the run while open.
+Keyboard O retains the debug tools. Hover a board character for
 an outline. Drag a character to see the destination cell highlighted green when
 valid and red when blocked; leaving the board or ending the drag clears it.
 Seal's Inspector gizmo also uses the normal grid-cell mask in Main.

@@ -37,7 +37,7 @@ namespace AlienAllIn.Tests
                 Assert.That(feedback.DragCell,Is.EqualTo(game.Cat.CurrentCell)); Assert.That(Vector4.Distance(feedback.dragOutline.startColor,feedback.invalidColor),Is.LessThan(.01f));
                 feedback.EndDrag(); yield return null;
                 Assert.That(feedback.dragOutline.enabled,Is.False); Assert.That(feedback.DragCell,Is.Null);
-                ui.OpenCharacter(game.Seal); yield return null; Assert.That(feedback.hoverOutline.enabled,Is.False); ui.CloseCharacter();
+                ui.OpenCharacter(game.Seal); yield return null; Assert.That(feedback.hoverOutline.enabled,Is.True); ui.CloseCharacter();
                 game.RunLoop.StartRun(); ui.OpenOptions(); Assert.That(game.RunLoop.State,Is.EqualTo(RunState.Paused));
                 ui.CloseOptions(); Assert.That(game.RunLoop.State,Is.EqualTo(RunState.Running));
                 game.RunLoop.Pause(); ui.OpenOptions(); ui.CloseOptions(); Assert.That(game.RunLoop.State,Is.EqualTo(RunState.Paused));
@@ -60,7 +60,7 @@ namespace AlienAllIn.Tests
             float hp=outside.Health; tick.Invoke(game,new object[]{.01f}); tick.Invoke(game,new object[]{.2f});
             Assert.That(inside.Health,Is.LessThan(10)); Assert.That(outside.Health,Is.EqualTo(hp));
             ui.Feedback.ShowRange(game.Seal.transform.position,false,1); yield return new WaitForSecondsRealtime(.2f);
-            Assert.That(ui.Feedback.RangeCellCount,Is.EqualTo(13));
+            Assert.That(ui.Feedback.RangeCellCount,Is.EqualTo(9));
             ScreenCapture.CaptureScreenshot(Path.GetFullPath("Logs/Reference-layout.png")); yield return null; yield return null;
             ui.Feedback.ShowRange(game.Seal.transform.position,true,1); yield return null; yield return null;
             Assert.That(ui.Feedback.RangeCellCount,Is.EqualTo(21));

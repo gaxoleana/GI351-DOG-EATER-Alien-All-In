@@ -15,7 +15,8 @@ namespace AlienAllIn.Tests
             EditorSceneManager.OpenScene("Assets/Scenes/Main.unity");
             var ui = Object.FindAnyObjectByType<MainCoreGameplayUI>();
             var canvas = ui.HudCanvas.transform;
-            Assert.That(canvas.Find("Run HUD/Wallet").GetComponent<Text>().text, Does.Contain("Chips"));
+            Assert.That(canvas.Find("Currency Panel/Wallet").GetComponent<Text>().text, Does.Contain("Chips"));
+            Assert.That(canvas.Find("Shop").GetComponent<Button>(), Is.Not.Null);
             Assert.That(canvas.Find("Character Popup/Upgrade Box/Close").GetComponent<Button>(), Is.Not.Null);
             Assert.That(canvas.Find("Character Popup/Upgrade Box/Upgrade").GetComponent<Button>(), Is.Not.Null);
             Assert.That(canvas.Find("Right Sidebar/Cash Upgrades"), Is.Null);

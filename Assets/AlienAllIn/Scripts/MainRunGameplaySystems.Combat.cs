@@ -402,7 +402,17 @@ namespace AlienAllIn
             float nearest = float.PositiveInfinity;
             foreach (ActivityStation station in stations)
             {
-                if (!station || station.Complete || station.requiredKind != actor.kind) continue;
+                if (!station || station.Complete) continue;
+                if (station == casinoMachine)
+                {
+                    if (casinoActive && casinoWorker == actor && IsStandingAt(actor, station))
+                    {
+                        if (!casinoFaulted && actor.State != ActorState.Panic) actor.State = ActorState.Working;
+                        return true;
+                    }
+                    continue;
+                }
+                if (station.requiredKind != actor.kind) continue;
                 float distance = (station.transform.position - actor.transform.position).sqrMagnitude;
                 if (distance >= nearest) continue;
                 nearest = distance;
@@ -419,6 +429,7 @@ namespace AlienAllIn
         void TickSeal(float dt)
         {
             if (seal.IsUltimateActive) return;
+            sealAttackClock -= dt;
             if (sealAttackPending)
             {
                 sealTelegraphClock -= dt;
@@ -438,7 +449,6 @@ namespace AlienAllIn
                 }
                 return;
             }
-            sealAttackClock -= dt;
             seal.RefreshCell(); bool inRange = false;
             foreach (var enemy in enemies)
             {
@@ -469,6 +479,7 @@ namespace AlienAllIn
 
         void ResetPufferCycle()
         {
+            ResetPufferPresentation();
             PufferPhase = PufferAttackPhase.Stationary; pufferTarget = null;
             pufferLockClock = pufferRestClock = 0; pufferBounces = 0;
             pufferLastContact = null; pufferDirection = Vector2.zero;
@@ -491,15 +502,15 @@ namespace AlienAllIn
                 pufferRestClock -= dt;
                 if (pufferRestClock > 0) return;
                 pufferTarget = FindNearestEnemy(pufferfish.transform.position, pufferfish.attackRange);
-                if (!pufferTarget) return;
                 PufferPhase = PufferAttackPhase.Locked;
                 pufferLockClock = pufferInflateSeconds; pufferBounces = 0;
             }
-            if (!pufferTarget || !pufferTarget.Alive || !board.TryWorldToCell(pufferTarget.transform.position, out _)) { StopPuffer(); return; }
             pufferfish.State = ActorState.Inflating;
             pufferLockClock -= dt;
             if (pufferLockClock > 0) return;
-            pufferDirection = (pufferTarget.transform.position - pufferfish.transform.position).normalized;
+            pufferDirection = pufferTarget && pufferTarget.Alive
+                ? (Vector2)(pufferTarget.transform.position - pufferfish.transform.position).normalized
+                : new Vector2(.8f, .6f);
             if (pufferDirection.sqrMagnitude < .01f) pufferDirection = Vector2.right;
             PufferPhase = PufferAttackPhase.Launched; pufferfish.State = ActorState.Moving;
             if (pufferfish.TryGetComponent(out AlienAnimationDriver animation)) animation.PlayAttack();
@@ -507,6 +518,7 @@ namespace AlienAllIn
 
         void TickPufferMovement(float dt)
         {
+            if (dt <= 0) return;
             if (!pufferfish || !pufferfish.Alive || manualDestinations.ContainsKey(pufferfish) ||
                 (PufferPhase != PufferAttackPhase.Launched && PufferPhase != PufferAttackPhase.Bouncing)) return;
             float speed = pufferFloatSpeed * (pufferfish.IsUltimateActive ? pufferUltimateSpeedMultiplier : 1f);
@@ -522,6 +534,9 @@ namespace AlienAllIn
                 {
                     Vector2Int min = board.ActiveMinCell;
                     bool xWall = outside.x < min.x || outside.x >= min.x + board.ActiveWidth;
+                    bool yWall = outside.y < min.y || outside.y >= min.y + board.ActiveHeight;
+                    if (xWall) pufferDirection.x = -pufferDirection.x;
+                    if (yWall) pufferDirection.y = -pufferDirection.y;
                     normal = xWall ? new Vector2(-Mathf.Sign(pufferDirection.x), 0) : new Vector2(0, -Mathf.Sign(pufferDirection.y));
                     contact = board;
                 }
@@ -531,31 +546,34 @@ namespace AlienAllIn
                     {
                         if (!enemy || !enemy.Alive || Vector3.Distance(proposed, enemy.transform.position) > pufferCollisionRadius + .18f) continue;
                         if (enemy == pufferLastContact) continue;
+                        if (Vector2.Dot(pufferDirection, current - enemy.transform.position) >= 0) continue;
                         contact = victim = enemy; normal = current - enemy.transform.position; break;
                     }
                     if (!contact) foreach (var station in stations)
                     {
                         if (!station || station == pufferLastContact || Vector3.Distance(proposed, station.transform.position) > pufferCollisionRadius + .2f) continue;
+                        if (Vector2.Dot(pufferDirection, current - station.transform.position) >= 0) continue;
                         contact = station; normal = current - station.transform.position; break;
                     }
                     if (!contact) foreach (var ally in runLoop.Survivors)
                     {
                         if (!ally || ally == pufferfish || !ally.Alive || ally == pufferLastContact || Vector3.Distance(proposed, ally.transform.position) > pufferCollisionRadius + .2f) continue;
+                        if (Vector2.Dot(pufferDirection, current - ally.transform.position) >= 0) continue;
                         contact = ally; normal = current - ally.transform.position; break;
                     }
                 }
                 if (contact)
                 {
                     if (normal.sqrMagnitude < .001f) normal = -pufferDirection;
-                    pufferDirection = Vector2.Reflect(pufferDirection, normal.normalized).normalized;
+                    if (contact != board) pufferDirection = Vector2.Reflect(pufferDirection, normal.normalized).normalized;
                     pufferLastContact = contact; pufferBounces++;
+                    PlayPufferCollisionSound();
                     if (victim)
                     {
                         float multiplier = pufferfish.IsUltimateActive ? pufferUltimateDamageMultiplier : 1;
                         float dealt = victim.Hurt(pufferfish.EffectiveDamage * pufferDamageMultiplier * multiplier);
                         RegisterEnemyHit(pufferfish, victim, dealt, pufferfish.IsUltimateActive);
                     }
-                    if (pufferBounces >= 2) { StopPuffer(); break; }
                     PufferPhase = PufferAttackPhase.Bouncing;
                     proposed = current + (Vector3)(pufferDirection * step);
                 }

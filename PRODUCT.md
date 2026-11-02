@@ -37,16 +37,26 @@ Duck automation, the three fighter combat roles and Ultimate actions, three
 Enemy archetypes, field Items, Coins, shared Chips, ATK upgrades and Score. GDD gaps and
 temporary prototype values are documented in `GAMEPLAY.md`.
 
-The confirmed core session lasts five minutes. Stations start empty and roll a
-25% spawn chance every 60 seconds. Static pixel-art prefabs distinguish Casino,
-Darts and Jump Rope, and the melee Roaster, ranged Toaster and Pan Shield enemies.
+The confirmed core session lasts five minutes. The Casino is present from the
+beginning and persists through the run; Darts and Jump Rope remain eligible for
+the 25% station roll every 60 seconds. Static pixel-art prefabs distinguish
+Casino, Darts and Jump Rope, and the melee Roaster, ranged Toaster and Pan Shield
+enemies.
 The session ends with a final score and Play Again. Main saves all HUD and attack
 VFX objects in its scene. Clicking a character opens a paused upgrade popup with
 a small camera zoom. Fighter upgrades add 0.1 ATK and double their Coin price
 per rank. Defeated enemies award 1-10 shared Chips. Duck has no HP/ATK and can be
 kidnapped; Chips pay its rescue ransom before the countdown expires. Seal uses
-the reference grid-cell attack masks, Cat a direct laser, and Pufferfish locks, launches, bounces twice,
-then stops and repeats.
+the reference grid-cell attack masks, Cat a direct laser, and Pufferfish inflates, launches and bounces continuously,
+reflecting from walls, allies and stations. Seal and Cat normal attacks use a 2-second base interval.
+
+The latest gameplay HUD places Stations/Enemy on the left, Items on the right,
+four character cards at the bottom, and Score/Grid Scale/Timer above a blue-framed
+board viewport. Clicking a dead card revives that member for 10 Coins while the
+run is unfinished. Revival restores full upgraded HP and places the member in
+the nearest usable empty cell; these restoration details are prototype rules.
+The wallet is visible at the top below Score/Grid Scale/Timer. Exchange above the right-hand
+Items panel opens the two-way 1:1 Chips/Coins exchange.
 
 `Assets/Scenes/Gameplay.unity` remains the playable duck + seal reference with
 fixed casino and jump-rope activities, enemies, supplies, Switch relocation,
@@ -57,10 +67,10 @@ and prototype scope.
 
 - The GDD names three combat aliens: seal, pufferfish, and cat. A duck supports objectives and collects items.
 - The intended loop is setup, start, autonomous activities and combat, player intervention, resource use, and a timer or team-elimination outcome.
-- Casino and Jump Rope belong to Seal; Darts belongs to Pufferfish. Duck can work all three. Cat defends. The fourth activity is undecided.
+- The GDD assigns Casino and Jump Rope to Seal and Darts to Pufferfish. In Main's current Casino prototype, only Duck can work the machine. Cat defends. The fourth activity is undecided.
 - The confirmed prototype opens at 5x5 and expands to 7x7, then 10x10 in one continuous session. Future final sizes and balance remain adjustable.
 - Enemy HP is stated as 10. Alien HP, attack cadence, damage, objective duration, enemy pathing, charge rates, shop timing/prices, upgrade and Chip effects, interruption rules, and score tick details are not specified and must be labeled as prototype assumptions.
-- The gambling theme is present, but a betting mechanic is not yet specified.
+- Casino x2/x4/x8 uses check/cross states: check earns Chips each tick, cross loses Chips until clicked. Process completion summarizes actual net without another payout. Rates are prototype settings.
 - The final game platform, full market/chip rules, and which items are included in the first build are undecided.
 - The GDD names Casino, Darts and Jump Rope but leaves the fourth activity and station type selection open. Main implements only the three named activities and uses a temporary uniform choice; no-cell Process spawns are skipped until the next roll.
 

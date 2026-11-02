@@ -132,7 +132,7 @@ namespace AlienAllIn.Tests
             game.DebugSpawnEnemy(); var target = game.Enemies[0]; Put(target, 5, 4);
             var vfx = Object.FindAnyObjectByType<AttackVfx>(); float health = target.Health;
             Call("TickSeal", .01f); yield return null;
-            Assert.That(ui.Feedback.RangeCellCount, Is.EqualTo(13));
+            Assert.That(ui.Feedback.RangeCellCount, Is.EqualTo(9));
             Assert.That(target.Health, Is.EqualTo(health)); Call("TickSeal", .2f); Assert.That(target.Health, Is.LessThan(health));
             Put(target, 3, 2); health = target.Health; Call("TickCat", .01f);
             Assert.That(vfx.CatRenderer.enabled, Is.True); Assert.That(target.Health, Is.LessThan(health));

@@ -25,6 +25,7 @@ namespace AlienAllIn
         public bool DebugSpawnStation(ActivityKind kind)
         {
             if (!DebugCanEdit) return DebugReport(false, "Restart the session before spawning.");
+            if (kind == ActivityKind.Casino) return DebugReport(false, "The permanent Casino is already on the board.");
             RefreshBoardOccupancy();
             var settings = System.Array.Find(activitySettings, a => a != null && a.kind == kind);
             bool spawned = SpawnActivity(settings);
@@ -54,7 +55,7 @@ namespace AlienAllIn
             DebugKillEnemies(false);
             foreach (var station in stations)
                 if (station && station.CurrentWorker && station.CurrentWorker.State == ActorState.Working) station.CurrentWorker.State = ActorState.Idle;
-            ClearSpawned(stations); ClearSpawned(fieldItems);
+            ClearTransientStations(); ClearSpawned(fieldItems);
             RefreshBoardOccupancy();
             DebugReport(true, "Cleared enemies, stations, drops and projectiles. Coins and Score kept.");
         }
@@ -65,7 +66,8 @@ namespace AlienAllIn
             side = Mathf.Clamp(side, 1, Mathf.Min(board.width, board.height));
             int living = 0;
             foreach (GridActor actor in runLoop.Survivors) if (actor && actor.Alive) living++;
-            if (side * side < living) return DebugReport(false, "Board is too small for the living team.");
+            if (side * side < living + (casinoMachine ? 1 : 0))
+                return DebugReport(false, "Board needs room for the living team and the permanent Casino.");
             stage.SetDebugSize(side, side);
             ReconcileDebugBoard();
             return DebugReport(true, $"Manual board: {side}x{side}. Auto or Restart restores timed expansion.");
@@ -88,13 +90,24 @@ namespace AlienAllIn
                 actor.RefreshCell();
                 if (!actor.IsOnBoard || !occupied.Add(actor.CurrentCell)) displaced.Add(actor);
             }
+            if (casinoMachine && !board.Contains(casinoMachine.Cell))
+            {
+                foreach (Vector2Int candidate in stage.ProcessSpawnCandidates)
+                {
+                    if (occupied.Contains(candidate)) continue;
+                    casinoMachine.transform.position = board.CellCenter(candidate);
+                    casinoMachine.RefreshView();
+                    occupied.Add(candidate);
+                    break;
+                }
+            }
             foreach (GridActor actor in displaced)
             {
                 float nearest = float.PositiveInfinity;
                 Vector2Int target = board.ActiveMinCell;
                 foreach (Vector2Int candidate in stage.ProcessSpawnCandidates)
                 {
-                    if (occupied.Contains(candidate)) continue;
+                    if (occupied.Contains(candidate) || IsCasinoCell(candidate)) continue;
                     float distance = (board.CellCenter(candidate) - actor.transform.position).sqrMagnitude;
                     if (distance >= nearest) continue;
                     nearest = distance; target = candidate;
@@ -105,6 +118,7 @@ namespace AlienAllIn
             for (int i = stations.Count - 1; i >= 0; i--)
             {
                 if (stations[i] && board.Contains(stations[i].Cell)) continue;
+                if (stations[i] == casinoMachine) continue;
                 if (stations[i])
                 {
                     if (stations[i].CurrentWorker && stations[i].CurrentWorker.State == ActorState.Working) stations[i].CurrentWorker.State = ActorState.Idle;

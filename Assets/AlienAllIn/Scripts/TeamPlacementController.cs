@@ -14,6 +14,7 @@ namespace AlienAllIn
         [SerializeField] RunLoopController runLoop;
         [SerializeField] BoardGrid board;
         [SerializeField] Camera stageCamera;
+        [SerializeField] MainRunGameplaySystems systems;
         [SerializeField, Tooltip("Enable the legacy IMGUI placement panel; MainCoreGameplayUI replaces it in Main.")]
         bool showLegacyPanel;
 
@@ -27,6 +28,7 @@ namespace AlienAllIn
 
         void Awake()
         {
+            if (!systems) systems = FindAnyObjectByType<MainRunGameplaySystems>();
             if (!runLoop) Debug.LogError("TeamPlacementController requires RunLoopController.", this);
             if (!board) Debug.LogError("TeamPlacementController requires BoardGrid.", this);
             if (!stageCamera) Debug.LogError("TeamPlacementController requires the stage camera.", this);
@@ -78,6 +80,12 @@ namespace AlienAllIn
 
                 selected = occupant;
                 message = $"{selected.kind} selected.";
+                return;
+            }
+
+            if (systems && systems.IsStationCell(cell))
+            {
+                message = "Station cell is reserved.";
                 return;
             }
 

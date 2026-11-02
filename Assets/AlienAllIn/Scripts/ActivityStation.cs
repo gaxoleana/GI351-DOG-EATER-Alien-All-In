@@ -28,8 +28,9 @@ namespace AlienAllIn
         float scoreClock;
         float interruptionRemaining;
         GridActor currentWorker;
+        bool continuousProgress;
         public float Progress => progress;
-        public bool Complete => progress >= 1;
+        public bool Complete => !continuousProgress && progress >= 1;
         public float InterruptionRemaining => interruptionRemaining;
         public GridActor CurrentWorker => currentWorker;
         public bool IsInterrupted => interruptionRemaining > 0;
@@ -45,6 +46,40 @@ namespace AlienAllIn
         {
             interruptionRemaining = Mathf.Max(interruptionRemaining, Mathf.Max(0f, interruptionSeconds));
             RefreshView();
+        }
+
+        public void SetContinuousProgress(bool enabled) => continuousProgress = enabled;
+
+        public void ClearInterruption()
+        {
+            interruptionRemaining = 0f;
+            RefreshView();
+        }
+
+        public bool AdvanceContinuous(float dt, GridActor worker, float workRate)
+        {
+            if (dt <= 0f) return false;
+            if (interruptionRemaining > 0f)
+            {
+                interruptionRemaining = Mathf.Max(0f, interruptionRemaining - dt);
+                RefreshView();
+                return false;
+            }
+
+            bool eligible = board && worker && worker.Alive && worker.IsOnBoard && worker.CurrentCell == Cell &&
+                Vector3.Distance(worker.transform.position, transform.position) <= .15f * board.cellSize;
+            if (!eligible)
+            {
+                currentWorker = null;
+                return false;
+            }
+
+            currentWorker = worker;
+            worker.State = ActorState.Working;
+            float advance = dt * Mathf.Max(.01f, workRate) / Mathf.Max(.01f, duration);
+            progress = Mathf.Repeat(progress + advance, 1f);
+            RefreshView();
+            return true;
         }
 
         public int Advance(float dt, GridActor worker, bool threatened) =>

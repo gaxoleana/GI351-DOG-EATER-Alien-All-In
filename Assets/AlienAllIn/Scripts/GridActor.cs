@@ -171,6 +171,20 @@ namespace AlienAllIn
             RefreshCell();
         }
 
+        public void Revive()
+        {
+            health = EffectiveMaxHealth;
+            switchCharge = ultimateRemaining = effectTimer = 0f;
+            AttackTimer = HitTimer = 0f;
+            state = ActorState.Idle;
+            ResolveBodyRenderer();
+            if (bodyRenderer) bodyRenderer.color = originalBodyColor;
+            if (attackEffect) attackEffect.enabled = false;
+            gameObject.SetActive(true);
+            RefreshCell();
+            if (TryGetComponent(out AlienAnimationDriver animationDriver)) animationDriver.ResetToIdle();
+        }
+
         public void Eliminate()
         {
             if (!Alive || invulnerable) return;

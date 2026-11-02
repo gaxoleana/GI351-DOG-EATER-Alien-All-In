@@ -71,6 +71,7 @@ namespace AlienAllIn.Editor
             var vfx = game.GetComponentInChildren<AttackVfx>(); var vfxData = new SerializedObject(vfx);
             vfxData.FindProperty("boardFeedback").objectReferenceValue = feedback; vfxData.ApplyModifiedPropertiesWithoutUndo();
             camera.GetComponent<MainSceneLayout>().RefreshCamera();
+            ReferenceImageLayoutAuthoring.ApplyTo(ui);
         }
         static LineRenderer Line(string name, Transform parent)
         {

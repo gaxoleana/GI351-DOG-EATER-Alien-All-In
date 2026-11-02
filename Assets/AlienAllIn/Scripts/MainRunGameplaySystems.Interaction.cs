@@ -34,15 +34,25 @@ namespace AlienAllIn
                 if (occupant && occupant.Alive && occupant != actor) return false;
             foreach (var order in manualDestinations)
                 if (order.Key != actor && order.Value == destination) return false;
-            // Matching station cells are valid destinations; incompatible stations are rejected.
+            // Matching station cells are valid destinations. Only Duck can work the active Casino.
             foreach (var station in stations)
-                if (station && station.Cell == destination && actor != duck && station.requiredKind != actor.kind) return false;
+            {
+                if (!station || station.Cell != destination) continue;
+                if (station == casinoMachine)
+                {
+                    if (actor != duck || !casinoActive || casinoWorker && casinoWorker.Alive && casinoWorker != actor) return false;
+                    continue;
+                }
+                if (actor != duck && station.requiredKind != actor.kind) return false;
+            }
             return true;
         }
         public bool TryOrderMove(GridActor actor, Vector2Int destination)
         {
             if (!CanOrderMove(actor, destination)) return false;
             var cell = board.GetCell(destination);
+            if (actor == casinoWorker && (!casinoMachine || destination != casinoMachine.Cell)) casinoWorker = null;
+            if (casinoMachine && destination == casinoMachine.Cell && casinoActive) casinoWorker = actor;
             if (runLoop.State == RunState.Placement)
             {
                 actor.transform.position = board.CellCenter(destination); actor.RefreshCell();
