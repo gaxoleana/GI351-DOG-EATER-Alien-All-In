@@ -1,0 +1,18 @@
+{
+  "antigravity-notifier": {
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "\"C:\\Users\\toone\\AppData\\Local\\Programs\\Python\\Python314\\python.exe\" \"D:\\Roblox\\AntigravityNotifier\\hooks\\on_pre_invocation.py\"",
+        "timeout": 5
+      }
+    ],
+    "Stop": [
+      {
+        "type": "command",
+        "command": "\"C:\\Users\\toone\\AppData\\Local\\Programs\\Python\\Python314\\python.exe\" \"D:\\Roblox\\AntigravityNotifier\\hooks\\on_stop.py\"",
+        "timeout": 15
+      }
+    ]
+  }
+}

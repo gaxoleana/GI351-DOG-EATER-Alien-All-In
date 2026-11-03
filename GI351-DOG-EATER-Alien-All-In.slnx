@@ -1,6 +1,6 @@
 ﻿<Solution>
   <Project Path="AlienAllIn.Runtime.csproj" />
-  <Project Path="AlienAllIn.Editor.csproj" />
   <Project Path="AlienAllIn.PlayModeTests.csproj" />
   <Project Path="AlienAllIn.EditorTests.csproj" />
+  <Project Path="AlienAllIn.Editor.csproj" />
 </Solution>

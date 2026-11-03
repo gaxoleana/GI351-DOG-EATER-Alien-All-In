@@ -12,7 +12,7 @@ namespace AlienAllIn
         [SerializeField, Tooltip("Optional overview. Off shows only the currently unlocked arcade board.")]
         bool frameMaximumBoard;
         [SerializeField, Min(0)] float worldPadding = .65f;
-        [SerializeField] Color backgroundColor = new Color(.87f, .87f, .87f, 1);
+        [SerializeField] Color backgroundColor = new Color(0.97f, 0.94f, 0.93f, 1f);
         [SerializeField, Range(.8f, .97f)] float selectedZoom = .88f;
         GridActor focusedActor;
         Vector3 focusPoint;
